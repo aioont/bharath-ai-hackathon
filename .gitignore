@@ -1,0 +1,59 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+.venv/
+venv/
+env/
+*.log
+
+# Environment
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Vite / Build
+frontend/dist/
+frontend/.vite/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# AWS
+.aws/
+
+# Database
+*.sqlite
+*.db
+
+# Uploaded files (local dev)
+backend/uploads/
+
+# Coverage
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Docker volumes
+pgdata/
