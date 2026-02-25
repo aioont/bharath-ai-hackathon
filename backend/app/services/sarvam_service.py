@@ -5,7 +5,6 @@ All calls use the official sarvamai Python SDK via asyncio.to_thread for non-blo
 from __future__ import annotations
 
 import asyncio
-import base64
 import structlog
 from typing import Optional, List
 

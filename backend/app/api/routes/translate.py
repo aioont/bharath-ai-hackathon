@@ -8,7 +8,7 @@ router = APIRouter(prefix="/api/translate", tags=["Translation"])
 
 @router.post("", response_model=TranslationResponse)
 async def translate(request: TranslationRequest):
-    """Translate agricultural text using Amazon Translate / Amazon Bedrock."""
+    """Translate agricultural text using Sarvam Translate."""
     if request.source_language == request.target_language:
         raise HTTPException(status_code=400, detail="Source and target languages must be different")
     
