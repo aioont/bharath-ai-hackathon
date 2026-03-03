@@ -34,11 +34,29 @@ class ChatMessageModel(BaseModel):
     timestamp: Optional[str] = None
 
 
+class FarmerCropDetail(BaseModel):
+    """A single crop entry from the farmer's crop list."""
+    crop_name: str
+    area_acres: Optional[float] = None
+    soil_type: Optional[str] = None
+    season: Optional[str] = None
+    irrigation: Optional[str] = None
+    variety: Optional[str] = None
+    notes: Optional[str] = None
+    is_primary: bool = False
+
+
 class FarmerProfile(BaseModel):
+    # Basic farmer info
     state: Optional[str] = None
+    district: Optional[str] = None
+    farming_type: Optional[str] = None
+    # Legacy single-crop fields (kept for backwards compat)
     crop: Optional[str] = None
     soil_type: Optional[str] = None
     season: Optional[str] = None
+    # Full multi-crop list (new)
+    crops: Optional[List[FarmerCropDetail]] = None
 
 
 class ChatRequest(BaseModel):
@@ -47,6 +65,7 @@ class ChatRequest(BaseModel):
     conversation_history: Optional[List[ChatMessageModel]] = []
     category: Optional[str] = None
     farmer_profile: Optional[FarmerProfile] = None
+    tts_enabled: bool = False  # If True, backend generates TTS audio and returns base64
 
 
 class ChatResponse(BaseModel):
@@ -55,6 +74,8 @@ class ChatResponse(BaseModel):
     suggestions: Optional[List[str]] = []
     related_topics: Optional[List[str]] = []
     confidence: float = Field(default=0.95, ge=0.0, le=1.0)
+    audio_base64: Optional[str] = None   # base64-encoded WAV from Sarvam TTS
+    audio_format: str = "wav"
 
 
 # ─── Crop Health ──────────────────────────────────────────────────────────────
@@ -141,8 +162,8 @@ class ForumAnswer(BaseModel):
 
 class ForumPost(BaseModel):
     id: Optional[str] = None
-    title: str = Field(..., min_length=10, max_length=200)
-    content: str = Field(..., min_length=20, max_length=5000)
+    title: str = Field(..., min_length=1, max_length=500)
+    content: str = Field(..., min_length=1, max_length=10000)
     author: str = "Anonymous"
     language: str = "en"
     category: str = ""

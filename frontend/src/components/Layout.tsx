@@ -32,20 +32,19 @@ export default function Layout({ children }: LayoutProps) {
           />
         )}
 
-        {/* Sidebar */}
+        {/* Sidebar - fixed between top bar and bottom nav, scrolls internally */}
         <aside
-          className={`
-            fixed lg:static inset-y-0 left-0 z-40 w-64 bg-white shadow-xl lg:shadow-none
-            transform transition-transform duration-300 ease-in-out
+          className={
+            `fixed left-0 w-64 z-50 bg-white shadow-xl transform transition-transform duration-300 ease-in-out
             ${state.sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
-            flex-shrink-0 border-r border-gray-100
-          `}
+            flex-shrink-0 border-r border-gray-100 overflow-y-auto top-0 bottom-0 lg:top-0 lg:bottom-0`
+          }
         >
           <Sidebar />
         </aside>
 
         {/* Main content */}
-        <main className="flex-1 overflow-y-auto">
+        <main className="flex-1 overflow-y-auto lg:ml-64">
           <div className="max-w-5xl mx-auto px-4 py-6 pb-24 lg:pb-6">
             {children}
           </div>

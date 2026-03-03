@@ -10,8 +10,14 @@ import MarketPrices from '@/pages/MarketPrices'
 import Weather from '@/pages/Weather'
 import Forum from '@/pages/Forum'
 import Profile from '@/pages/Profile'
+import Login from '@/pages/Login'
+import Register from '@/pages/Register'
+import VerifyEmail from '@/pages/VerifyEmail'
 import PWAInstallBanner from '@/components/PWAInstallBanner'
 import OfflineBanner from '@/components/OfflineBanner'
+import EvalDashboard from '@/pages/EvalDashboard'
+import InsuranceSuggestion from '@/pages/InsuranceSuggestion'
+import AdminGate from '@/components/AdminGate'
 
 export default function App() {
   return (
@@ -28,6 +34,11 @@ export default function App() {
             <Route path="/weather" element={<Weather />} />
             <Route path="/forum" element={<Forum />} />
             <Route path="/profile" element={<Profile />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+            <Route path="/verify-email" element={<VerifyEmail />} />
+            <Route path="/admin/eval" element={<AdminGate><EvalDashboard /></AdminGate>} />
+            <Route path="/insurance" element={<InsuranceSuggestion />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Layout>

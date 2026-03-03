@@ -1,30 +1,32 @@
 from __future__ import annotations
 import logging
+import time
 from contextlib import asynccontextmanager
 
-import structlog
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 
 from app.core.config import settings
-from app.api.routes import translate, chat, crop_health, weather, market, forum
+from app.api.routes import translate, chat, crop_health, weather, market, forum, news, auth, crops
+from app.api.routes import plan, market_analyzer, scheme_advisor, mock_iot, evaluation, insurance
 
 # ---------------------------------------------------------------------------
-# Structured logging
+# Logging — configure stdlib logging so every logger in every route works
 # ---------------------------------------------------------------------------
-structlog.configure(
-    processors=[
-        structlog.processors.TimeStamper(fmt="iso"),
-        structlog.stdlib.add_log_level,
-        structlog.processors.JSONRenderer(),
-    ],
-    wrapper_class=structlog.BoundLogger,
-    logger_factory=structlog.PrintLoggerFactory(),
+logging.basicConfig(
+    level=logging.DEBUG if settings.DEBUG else logging.INFO,
+    format="%(asctime)s  %(levelname)-8s  %(name)s  %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
 )
-log = structlog.get_logger(__name__)
-logging.basicConfig(level=logging.INFO)
+# Also quieten noisy third-party libraries
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
+logging.getLogger("psycopg2").setLevel(logging.WARNING)
+logging.getLogger("urllib3").setLevel(logging.WARNING)
+
+log = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -32,9 +34,9 @@ logging.basicConfig(level=logging.INFO)
 # ---------------------------------------------------------------------------
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    log.info("startup", app="agri-translate-ai", version=settings.APP_VERSION)
+    log.info("=== Agri-Translate AI starting (v%s) ===", settings.APP_VERSION)
     yield
-    log.info("shutdown")
+    log.info("=== Agri-Translate AI shutting down ===")
 
 
 # ---------------------------------------------------------------------------
@@ -51,6 +53,25 @@ app = FastAPI(
     redoc_url="/redoc",
     lifespan=lifespan,
 )
+
+# ---------------------------------------------------------------------------
+# Request logging middleware
+# ---------------------------------------------------------------------------
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    start = time.perf_counter()
+    response = await call_next(request)
+    duration_ms = (time.perf_counter() - start) * 1000
+    level = logging.WARNING if response.status_code >= 400 else logging.INFO
+    log.log(
+        level,
+        "%-6s %-50s  %s  %.0fms",
+        request.method,
+        request.url.path,
+        response.status_code,
+        duration_ms,
+    )
+    return response
 
 # ---------------------------------------------------------------------------
 # Middleware
@@ -73,6 +94,15 @@ app.include_router(crop_health.router)
 app.include_router(weather.router)
 app.include_router(market.router)
 app.include_router(forum.router)
+app.include_router(news.router)
+app.include_router(auth.router)
+app.include_router(crops.router)
+app.include_router(plan.router)
+app.include_router(market_analyzer.router)
+app.include_router(scheme_advisor.router)
+app.include_router(mock_iot.router)
+app.include_router(evaluation.router)
+app.include_router(insurance.router)
 
 
 # ---------------------------------------------------------------------------
@@ -103,6 +133,6 @@ async def health():
 # Global exception handler
 # ---------------------------------------------------------------------------
 @app.exception_handler(Exception)
-async def unhandled_exception(request, exc):
-    log.error("unhandled_exception", error=str(exc), path=str(request.url))
+async def unhandled_exception(request: Request, exc: Exception):
+    log.exception("Unhandled exception on %s %s", request.method, request.url.path)
     return JSONResponse(status_code=500, content={"detail": "Internal server error"})

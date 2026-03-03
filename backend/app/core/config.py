@@ -21,6 +21,11 @@ class Settings(BaseSettings):
     AWS_SECRET_ACCESS_KEY: str = ""
     AWS_REGION: str = "ap-south-1"
 
+    # Bedrock
+    BEDROCK_CLAUDE_MODEL_ID: str = "anthropic.claude-3-haiku-20240307-v1:0"
+    BEDROCK_GUARDRAIL_ID: str = ""
+    BEDROCK_GUARDRAIL_VERSION: str = "DRAFT"
+
     # Database (Supabase PostgreSQL)
     DATABASE_URL: str = "postgresql://postgres:7MGCdVgJjwRruuXT@db.omsukgvwlzmyprszgkuj.supabase.co:5432/postgres"
     DATABASE_POOL_URL: str = "postgresql://postgres.omsukgvwlzmyprszgkuj:7MGCdVgJjwRruuXT@aws-1-ap-northeast-1.pooler.supabase.com:6543/postgres"
@@ -42,6 +47,9 @@ class Settings(BaseSettings):
     # Security
     SECRET_KEY: str = "change-this-in-production-please"
     CORS_ORIGINS: str = '["http://localhost:3000","http://localhost:3001","http://localhost:5173","http://localhost:4173","http://127.0.0.1:3000","http://127.0.0.1:3001","http://127.0.0.1:5173"]'
+
+    # Resend (email)
+    RESEND_API_KEY: str = ""
 
     # Rate limiting
     RATE_LIMIT_PER_MINUTE: int = 60

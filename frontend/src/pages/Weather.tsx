@@ -14,6 +14,62 @@ function dayName(dateStr: string) {
   return DAY_NAMES[d.getDay()]
 }
 
+/** Generate dynamic agricultural insights based on weather conditions */
+function generateAgriculturalInsights(current: WeatherData, forecast: WeatherData[]): string[] {
+  const insights: string[] = []
+  const temp = current.temperature.current
+  const humidity = current.humidity
+  const rainfall = current.rainfall
+  const windSpeed = current.wind_speed
+  
+  // Check for upcoming rain
+  const rainExpectedSoon = forecast.slice(0, 3).some(day => day.rainfall > 5)
+  
+  // Irrigation advice based on humidity and rainfall
+  if (rainfall > 10) {
+    insights.push('Heavy rainfall today — postpone irrigation and fertilizer application')
+  } else if (humidity > 75 && rainfall < 5) {
+    insights.push('High soil moisture — delay irrigation by 2-3 days to prevent waterlogging')
+  } else if (humidity < 40 && rainfall === 0) {
+    insights.push('Low humidity and no rain — increase irrigation frequency')
+  }
+  
+  // Spraying window based on wind and rain
+  if (windSpeed < 10 && rainfall === 0 && !rainExpectedSoon) {
+    insights.push('Ideal spray window — low wind conditions, apply pesticides early morning')
+  } else if (windSpeed > 20) {
+    insights.push('High wind conditions — avoid spraying pesticides to prevent drift')
+  } else if (rainExpectedSoon) {
+    insights.push('Rain expected soon — delay pesticide application by 24-48 hours')
+  }
+  
+  // Temperature-based advice
+  if (temp > 35) {
+    insights.push('High temperature alert — apply mulching and ensure adequate irrigation')
+  } else if (temp < 15) {
+    insights.push('Cool weather — monitor crops for frost damage, consider protective covering')
+  } else if (temp >= 20 && temp <= 30 && !rainExpectedSoon) {
+    insights.push('Optimal growing temperature — good conditions for crop development')
+  }
+  
+  // Pest and disease monitoring
+  if (humidity > 70 && temp >= 25) {
+    insights.push('High humidity and warm temperature — monitor crops for fungal diseases')
+  } else if (temp > 30 && humidity < 50) {
+    insights.push('Hot and dry conditions — watch for pest activity, especially aphids and mites')
+  }
+  
+  // Harvesting advice
+  if (rainfall === 0 && windSpeed < 15 && humidity < 60) {
+    insights.push('Excellent harvesting conditions — dry weather with moderate winds')
+  } else if (rainExpectedSoon) {
+    insights.push('Complete harvesting operations before rainfall to prevent crop damage')
+  }
+  
+  // Return top 3 most relevant insights
+  return insights.slice(0, 3)
+}
+
 /** Generate location-aware fallback demo weather (used when API is unreachable) */
 function makeDemoWeather(location: string): WeatherForecast {
   const today = new Date()
@@ -32,15 +88,14 @@ function makeDemoWeather(location: string): WeatherForecast {
       alerts: [],
     }
   }
+  const current = { ...makeDay(0), condition: 'partly-cloudy' as const, alerts: [{ type: 'info' as const, message: 'Light rain expected in 3 days. Complete harvesting before then.', severity: 'low' as const }] }
+  const forecast = [1, 2, 3, 4, 5, 6].map(makeDay)
+  
   return {
     location,
-    current: { ...makeDay(0), condition: 'partly-cloudy', alerts: [{ type: 'info', message: 'Light rain expected in 3 days. Complete harvesting before then.', severity: 'low' }] },
-    forecast: [1, 2, 3, 4, 5, 6].map(makeDay),
-    agricultural_insights: [
-      'Soil moisture is adequate — delay irrigation by 2-3 days',
-      'Monitor crops for pest activity after recent weather changes',
-      'Good spray window available for next 2 days — apply early morning',
-    ],
+    current,
+    forecast,
+    agricultural_insights: generateAgriculturalInsights(current, forecast),
   }
 }
 

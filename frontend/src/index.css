@@ -7,7 +7,7 @@
     --color-primary: 22 163 74;
     --color-earth: 223 130 32;
   }
-  
+
   * {
     box-sizing: border-box;
   }
@@ -34,21 +34,15 @@
 
 @layer components {
   .btn-primary {
-    @apply bg-primary-600 hover:bg-primary-700 active:bg-primary-800 text-white font-semibold 
-           py-2.5 px-5 rounded-xl transition-all duration-200 shadow-md hover:shadow-lg 
-           active:scale-95 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2;
+    @apply bg-primary-600 hover:bg-primary-700 active:bg-primary-800 text-white font-semibold py-2.5 px-5 rounded-xl transition-all duration-200 shadow-md hover:shadow-lg active:scale-95 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2;
   }
 
   .btn-secondary {
-    @apply bg-white hover:bg-primary-50 active:bg-primary-100 text-primary-700 font-semibold
-           py-2.5 px-5 rounded-xl border-2 border-primary-300 transition-all duration-200
-           hover:border-primary-400 active:scale-95 focus:outline-none focus:ring-2 focus:ring-primary-500;
+    @apply bg-white hover:bg-primary-50 active:bg-primary-100 text-primary-700 font-semibold py-2.5 px-5 rounded-xl border-2 border-primary-300 transition-all duration-200 hover:border-primary-400 active:scale-95 focus:outline-none focus:ring-2 focus:ring-primary-500;
   }
 
   .btn-earth {
-    @apply bg-earth-500 hover:bg-earth-600 active:bg-earth-700 text-white font-semibold
-           py-2.5 px-5 rounded-xl transition-all duration-200 shadow-md hover:shadow-lg
-           active:scale-95 focus:outline-none focus:ring-2 focus:ring-earth-400;
+    @apply bg-earth-500 hover:bg-earth-600 active:bg-earth-700 text-white font-semibold py-2.5 px-5 rounded-xl transition-all duration-200 shadow-md hover:shadow-lg active:scale-95 focus:outline-none focus:ring-2 focus:ring-earth-400;
   }
 
   .card {
@@ -60,15 +54,11 @@
   }
 
   .input-field {
-    @apply w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-primary-500 
-           focus:outline-none focus:ring-2 focus:ring-primary-200 transition-all duration-200
-           bg-white placeholder-gray-400 text-gray-800;
+    @apply w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-200 transition-all duration-200 bg-white placeholder-gray-400 text-gray-800;
   }
 
   .select-field {
-    @apply w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-primary-500 
-           focus:outline-none focus:ring-2 focus:ring-primary-200 transition-all duration-200
-           bg-white text-gray-800 cursor-pointer;
+    @apply w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-200 transition-all duration-200 bg-white text-gray-800 cursor-pointer;
   }
 
   .badge {
@@ -100,13 +90,11 @@
   }
 
   .nav-link {
-    @apply flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 hover:text-primary-700
-           hover:bg-primary-50 transition-all duration-200 font-medium cursor-pointer;
+    @apply flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 hover:text-primary-700 hover:bg-primary-50 transition-all duration-200 font-medium cursor-pointer;
   }
 
   .nav-link-active {
-    @apply flex items-center gap-3 px-4 py-3 rounded-xl text-primary-700 bg-primary-100
-           font-semibold cursor-pointer;
+    @apply flex items-center gap-3 px-4 py-3 rounded-xl text-primary-700 bg-primary-100 font-semibold cursor-pointer;
   }
 
   .chat-bubble-user {
@@ -118,8 +106,7 @@
   }
 
   .language-chip {
-    @apply inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium
-           border-2 cursor-pointer transition-all duration-200 select-none;
+    @apply inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium border-2 cursor-pointer transition-all duration-200 select-none;
   }
 
   .language-chip-active {
@@ -143,8 +130,7 @@
   }
 
   .install-prompt {
-    @apply fixed bottom-20 left-4 right-4 bg-primary-700 text-white rounded-2xl p-4 shadow-2xl z-40
-           flex items-center gap-3 md:max-w-sm md:left-auto md:right-4;
+    @apply fixed bottom-20 left-4 right-4 bg-primary-700 text-white rounded-2xl p-4 shadow-2xl z-40 flex items-center gap-3 md:max-w-sm md:left-auto md:right-4;
   }
 }
 
@@ -153,6 +139,7 @@
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
+
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
   }
@@ -190,13 +177,16 @@
     width: 6px;
     height: 6px;
   }
+
   ::-webkit-scrollbar-track {
     background: #f1f5f9;
   }
+
   ::-webkit-scrollbar-thumb {
     background: #cbd5e1;
     border-radius: 3px;
   }
+
   ::-webkit-scrollbar-thumb:hover {
     background: #94a3b8;
   }
@@ -204,9 +194,19 @@
 
 /* PWA install prompt animation */
 @keyframes slideUpBounce {
-  0% { transform: translateY(100%); opacity: 0; }
-  70% { transform: translateY(-8px); }
-  100% { transform: translateY(0); opacity: 1; }
+  0% {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+
+  70% {
+    transform: translateY(-8px);
+  }
+
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
 }
 
 .animate-slide-up-bounce {
@@ -224,6 +224,182 @@
 }
 
 @keyframes recordingPulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.4); }
-  50% { box-shadow: 0 0 0 12px rgba(220, 38, 38, 0); }
+
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.4);
+  }
+
+  50% {
+    box-shadow: 0 0 0 12px rgba(220, 38, 38, 0);
+  }
+}
+
+/* ── Agent Hero Card animations ─────────────────────────── */
+
+/* Mic icon slow breathing float */
+@keyframes agentFloat {
+
+  0%,
+  100% {
+    transform: translateY(0px) scale(1);
+  }
+
+  50% {
+    transform: translateY(-8px) scale(1.04);
+  }
+}
+
+.animate-agent-float {
+  animation: agentFloat 3.6s ease-in-out infinite;
+}
+
+/* Outer glow ring — soft breathing pulse */
+@keyframes agentRingBreath {
+
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.55;
+    box-shadow: 0 0 0 0 rgba(134, 239, 172, 0.5);
+  }
+
+  50% {
+    transform: scale(1.10);
+    opacity: 0.85;
+    box-shadow: 0 0 40px 16px rgba(134, 239, 172, 0.18);
+  }
+}
+
+.animate-agent-ring {
+  animation: agentRingBreath 3.6s ease-in-out infinite;
+}
+
+/* Middle ring — slightly offset phase */
+@keyframes agentRingBreath2 {
+
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.4;
+  }
+
+  50% {
+    transform: scale(1.14);
+    opacity: 0.7;
+  }
+}
+
+.animate-agent-ring2 {
+  animation: agentRingBreath2 3.6s ease-in-out 0.6s infinite;
+}
+
+/* Inner ring — fastest phase */
+@keyframes agentRingBreath3 {
+
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.3;
+  }
+
+  50% {
+    transform: scale(1.18);
+    opacity: 0.6;
+  }
+}
+
+.animate-agent-ring3 {
+  animation: agentRingBreath3 3.6s ease-in-out 1.2s infinite;
+}
+
+/* Card gradient shimmer */
+@keyframes agentGradientShift {
+  0% {
+    background-position: 0% 50%;
+  }
+
+  50% {
+    background-position: 100% 50%;
+  }
+
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.animate-gradient-shift {
+  background-size: 300% 300%;
+  animation: agentGradientShift 6s ease infinite;
+}
+
+/* Floating particles */
+@keyframes agentParticle {
+  0% {
+    transform: translateY(0) translateX(0) scale(1);
+    opacity: 0.6;
+  }
+
+  50% {
+    transform: translateY(-18px) translateX(6px) scale(1.2);
+    opacity: 1;
+  }
+
+  100% {
+    transform: translateY(0) translateX(0) scale(1);
+    opacity: 0.6;
+  }
+}
+
+.animate-particle-1 {
+  animation: agentParticle 4s ease-in-out 0s infinite;
+}
+
+.animate-particle-2 {
+  animation: agentParticle 4s ease-in-out 1s infinite;
+}
+
+.animate-particle-3 {
+  animation: agentParticle 4s ease-in-out 2s infinite;
+}
+
+.animate-particle-4 {
+  animation: agentParticle 4s ease-in-out 1.5s infinite;
+}
+
+/* Text shimmer */
+@keyframes agentTextShimmer {
+  0% {
+    background-position: -200% center;
+  }
+
+  100% {
+    background-position: 200% center;
+  }
+}
+
+.animate-text-shimmer {
+  background: linear-gradient(90deg, #bbf7d0 0%, #ffffff 40%, #86efac 60%, #bbf7d0 100%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: agentTextShimmer 4s linear infinite;
+}
+
+/* Subtle card border glow */
+@keyframes agentBorderGlow {
+
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(134, 239, 172, 0.0), 0 25px 60px rgba(0, 0, 0, 0.35);
+  }
+
+  50% {
+    box-shadow: 0 0 30px 4px rgba(134, 239, 172, 0.25), 0 25px 60px rgba(0, 0, 0, 0.35);
+  }
+}
+
+.animate-agent-card {
+  animation: agentBorderGlow 3.6s ease-in-out infinite;
 }

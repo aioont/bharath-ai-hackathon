@@ -3,10 +3,10 @@ import { Home, Languages, MessageSquareText, Leaf, TrendingUp, CloudSun, Users }
 
 const bottomNavItems = [
   { to: '/', label: 'Home', icon: Home },
-  { to: '/translate', label: 'Translate', icon: Languages },
-  { to: '/chat', label: 'AI Chat', icon: MessageSquareText },
-  { to: '/market', label: 'Market', icon: TrendingUp },
+  { to: '/chat', label: 'AgriSaarthi', icon: MessageSquareText },
   { to: '/forum', label: 'Forum', icon: Users },
+  { to: '/market', label: 'Market', icon: TrendingUp },
+  { to: '/translate', label: 'Translate', icon: Languages },
 ]
 
 export default function BottomNav() {

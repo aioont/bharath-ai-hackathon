@@ -5,6 +5,8 @@ All calls use the official sarvamai Python SDK via asyncio.to_thread for non-blo
 from __future__ import annotations
 
 import asyncio
+import functools
+import pathlib
 import structlog
 from typing import Optional, List
 
@@ -12,6 +14,34 @@ from app.core.config import settings
 from app.models.schemas import ChatMessageModel, FarmerProfile
 
 logger = structlog.get_logger()
+
+_PROMPTS_FILE = pathlib.Path(__file__).parent.parent / "prompts.yaml"
+
+
+@functools.lru_cache(maxsize=1)
+def _load_prompts() -> dict:
+    """Load prompts.yaml once at startup (cached in-process)."""
+    try:
+        import yaml  # type: ignore
+        with open(_PROMPTS_FILE, "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+        logger.info("prompts_loaded", categories=list(data.get("categories", {}).keys()))
+        return data
+    except Exception as exc:
+        logger.error("prompts_load_failed", error=str(exc), path=str(_PROMPTS_FILE))
+        return {}
+
+
+def _build_system_prompt(category: Optional[str] = None) -> str:
+    """Combine base_prompt with the selected category's role_suffix from prompts.yaml."""
+    prompts = _load_prompts()
+    base = prompts.get("base_prompt", "").strip()
+    if category:
+        cat_data = prompts.get("categories", {}).get(category, {})
+        role_suffix = cat_data.get("role_suffix", "").strip()
+        if role_suffix:
+            return f"{base}\n\n{role_suffix}"
+    return base
 
 # ---------------------------------------------------------------------------
 # Language code mapping  (2-letter app code → Sarvam BCP-47 code)
@@ -32,26 +62,7 @@ LANG_NAMES = {
     "en": "English", "ne": "Nepali", "sa": "Sanskrit", "si": "Sinhala",
 }
 
-SYSTEM_PROMPT = """You are AgriAI, an expert agricultural advisor for Indian farmers, powered by Sarvam AI.
-
-Your expertise includes:
-- Crop management, cultivation techniques, and best practices
-- Pest identification, disease diagnosis, and organic/chemical treatment options
-- Soil health, fertilizer recommendations, and organic farming methods
-- Water management, irrigation systems, and conservation techniques
-- Market intelligence, price forecasting, and selling strategies
-- Government schemes, subsidies, PM Kisan, crop insurance, eNAM platform
-- Weather-based farming decisions and climate adaptation
-- Post-harvest management and storage techniques
-
-Important guidelines:
-1. Always respond in the language specified
-2. Provide practical, actionable advice specific to Indian farming conditions
-3. Mention specific product names, doses, and application methods when relevant
-4. Consider regional variations across different Indian states
-5. Be empathetic — most farmers have limited resources
-6. Cite government schemes when relevant
-7. Keep responses concise but comprehensive"""
+# System prompts are now loaded from backend/app/prompts.yaml via _load_prompts() / _build_system_prompt()
 
 
 def _get_sarvam_client():
@@ -70,8 +81,118 @@ def _get_sarvam_client():
 
 
 # ---------------------------------------------------------------------------
-# Chat / Reasoning  (Sarvam-M)
+# Agent Tools & Search
 # ---------------------------------------------------------------------------
+
+def _tool_search_web(query: str) -> str:
+    """Perform a real web search using DuckDuckGo."""
+    try:
+        from duckduckgo_search import DDGS
+        with DDGS() as ddgs:
+            results = list(ddgs.text(query, max_results=3))
+            if not results:
+                return "No search results found."
+            summary = "\n".join([f"- {r['title']}: {r['body']}" for r in results])
+            return f"Search Results for '{query}':\n{summary}"
+    except ImportError:
+        return "Search tool unavailable (duckduckgo_search not installed)."
+    except Exception as e:
+        logger.error("search_tool_error", error=str(e))
+        return f"Search failed: {str(e)}"
+
+def _tool_get_weather(location: str) -> str:
+    """Get weather data by searching online."""
+    return _tool_search_web(f"current weather in {location} forecast moisture humidity")
+
+def _tool_market_prices(commodity: str, location: str) -> str:
+    """Get market prices by searching online."""
+    return _tool_search_web(f"current market price (mandi bhav) of {commodity} in {location} today")
+
+AVAILABLE_TOOLS = {
+    "SEARCH": _tool_search_web,
+    "WEATHER": _tool_get_weather,
+    "MARKET": _tool_market_prices,
+}
+
+
+# ---------------------------------------------------------------------------
+# Chat / Reasoning  (Sarvam-M with Tool Use)
+# ---------------------------------------------------------------------------
+
+async def _agent_loop(messages: list, system_prompt: str, tools_enabled: bool = True) -> str:
+    """
+    Run a ReAct-style loop:
+    1. AI thinks -> decides to use a tool or answer.
+    2. If tool -> execute tool -> add result to history -> repeat.
+    3. If answer -> return.
+    """
+    if not tools_enabled:
+        return await asyncio.to_thread(_sync_chat, messages, system_prompt)
+
+    # Augmented system prompt for tool use
+    tool_instructions = (
+        "\n\nYou have access to these tools to answer questions accurately:\n"
+        "- SEARCH: General knowledge, news, government schemes.\n"
+        "- WEATHER: Current weather and forecasts.\n"
+        "- MARKET: Mandi prices and market trends.\n\n"
+        "To use a tool, your response must be valid JSON strictly in this format:\n"
+        '{"tool": "SEARCH", "query": "your search query"}\n'
+        '{"tool": "WEATHER", "location": "city name"}\n'
+        '{"tool": "MARKET", "commodity": "crop name", "location": "city/state"}\n\n'
+        "If no tool is needed, just respond with your expert advice in the user's language."
+    )
+    
+    agent_system = system_prompt + tool_instructions
+    
+    # We allow max 3 tool turns to prevent loops
+    for _ in range(3):
+        try:
+            # 1. Get AI response
+            response_text = await asyncio.to_thread(_sync_chat, messages, agent_system)
+            
+            # 2. Check if it's a tool call (JSON)
+            import json
+            import re
+            
+            # Try to find JSON block
+            json_match = re.search(r"\{.*\}", response_text, re.DOTALL)
+            if json_match:
+                try:
+                    tool_call = json.loads(json_match.group())
+                    tool_name = tool_call.get("tool")
+                    
+                    if tool_name in AVAILABLE_TOOLS:
+                        # Execute Tool
+                        logger.info("agent_tool_use", tool=tool_name, params=tool_call)
+                        
+                        if tool_name == "SEARCH":
+                            tool_result = await asyncio.to_thread(_tool_search_web, tool_call.get("query", ""))
+                        elif tool_name == "WEATHER":
+                            tool_result = await asyncio.to_thread(_tool_get_weather, tool_call.get("location", ""))
+                        elif tool_name == "MARKET":
+                            tool_result = await asyncio.to_thread(_tool_market_prices, tool_call.get("commodity", ""), tool_call.get("location", ""))
+                        else:
+                            tool_result = "Unknown tool."
+
+                        # Append Exchange to History
+                        # Note: We need to append the AI's "thought" (the JSON) and the "observation" (result)
+                        # Sarvam might handle this better if we just append the result as a System or User message context
+                        messages.append({"role": "assistant", "content": response_text})
+                        messages.append({"role": "user", "content": f"Tool Output: {tool_result}\n\nNow answer the user's original request based on this."})
+                        continue  # Loop again to get final answer
+                        
+                except json.JSONDecodeError:
+                    pass # Not valid JSON, treat as final answer
+
+            # If no valid tool call found, this is the final answer
+            return response_text
+
+        except Exception as e:
+            logger.error("agent_loop_error", error=str(e))
+            return "I apologize, but I encountered an error while processing your request."
+
+    return "I apologize, this request is taking too long."
+
 
 def _sync_chat(messages: list, system: str) -> str:
     client = _get_sarvam_client()
@@ -114,21 +235,92 @@ async def get_ai_response(
     farmer_profile: Optional[FarmerProfile] = None,
 ) -> dict:
     """Generate AI response using Sarvam-M model."""
+    # Apply AWS Guardrail (ONLY for English)
+    if language == "en":
+        from app.core.aws_client import get_bedrock_client
+        bedrock = get_bedrock_client()
+        if bedrock:
+            try:
+                # Run sync in thread to avoid blocking loop
+                guard_res = await asyncio.to_thread(bedrock.apply_guardrail, message, "INPUT")
+                if guard_res.get("action") == "GUARDRAIL_INTERVENED":
+                    logger.warning("guardrail_blocked_input", message=message[:50])
+                    return {
+                        "response": "I apologize, but I cannot answer that question as it violates our safety policies.",
+                        "language": language,
+                        "model": "guardrail-intervention",
+                        "tokens_used": 0,
+                    }
+            except Exception as e:
+                logger.error("guardrail_check_failed", error=str(e))
+                # Fail open (continue)
+
     lang_name = LANG_NAMES.get(language, "English")
     profile_ctx = ""
     if farmer_profile:
-        parts = [
-            f"Location: {farmer_profile.state}" if farmer_profile.state else "",
-            f"Primary crop: {farmer_profile.crop}" if getattr(farmer_profile, "crop", None) else "",
-            f"Soil: {farmer_profile.soil_type}" if farmer_profile.soil_type else "",
-            f"Season: {farmer_profile.season}" if getattr(farmer_profile, "season", None) else "",
-        ]
-        profile_ctx = "\nFarmer context: " + ", ".join(p for p in parts if p)
+        ctx_parts = []
+
+        # Basic farmer info
+        if farmer_profile.state:
+            loc = farmer_profile.state
+            if farmer_profile.district:
+                loc = f"{farmer_profile.district}, {farmer_profile.state}"
+            ctx_parts.append(f"Location: {loc}")
+
+        if farmer_profile.farming_type:
+            ctx_parts.append(f"Farming approach: {farmer_profile.farming_type}")
+
+        # Multi-crop list (preferred)
+        if farmer_profile.crops:
+            primary = next((c for c in farmer_profile.crops if c.is_primary), None)
+            if primary:
+                ctx_parts.append(f"Primary crop: {primary.crop_name}" +
+                    (f" ({primary.variety})" if primary.variety else "") +
+                    (f", {primary.area_acres} acres" if primary.area_acres else "") +
+                    (f", {primary.season} season" if primary.season else "") +
+                    (f", {primary.irrigation} irrigation" if primary.irrigation else "") +
+                    (f", {primary.soil_type} soil" if primary.soil_type else ""))
+
+            other_crops = [c for c in farmer_profile.crops if not c.is_primary]
+            if other_crops:
+                other_names = ", ".join(
+                    c.crop_name + (f" ({c.area_acres} ac)" if c.area_acres else "")
+                    for c in other_crops
+                )
+                ctx_parts.append(f"Also grows: {other_names}")
+
+            # Collect all unique soil types and seasons across crops
+            soils = list({c.soil_type for c in farmer_profile.crops if c.soil_type})
+            seasons = list({c.season for c in farmer_profile.crops if c.season})
+            irrigations = list({c.irrigation for c in farmer_profile.crops if c.irrigation})
+            if soils:
+                ctx_parts.append(f"Soil type(s): {', '.join(soils)}")
+            if seasons:
+                ctx_parts.append(f"Season(s): {', '.join(seasons)}")
+            if irrigations:
+                ctx_parts.append(f"Irrigation: {', '.join(irrigations)}")
+
+            total_area = sum(c.area_acres or 0 for c in farmer_profile.crops)
+            if total_area > 0:
+                ctx_parts.append(f"Total farm area: {total_area:.1f} acres")
+
+        else:
+            # Fallback: legacy single-crop fields
+            if farmer_profile.crop:
+                ctx_parts.append(f"Primary crop: {farmer_profile.crop}")
+            if farmer_profile.soil_type:
+                ctx_parts.append(f"Soil: {farmer_profile.soil_type}")
+            if farmer_profile.season:
+                ctx_parts.append(f"Season: {farmer_profile.season}")
+
+        if ctx_parts:
+            profile_ctx = "\nFarmer context: " + " | ".join(ctx_parts)
+
+    system_prompt_base = _build_system_prompt(category)
 
     system = (
-        SYSTEM_PROMPT
-        + f"\n\nRespond in {lang_name}."
-        + (f"\nFocus on: {category}" if category else "")
+        system_prompt_base
+        + f"\n\nRespond in {lang_name}. Language Code: {language}"
         + profile_ctx
     )
 
@@ -139,17 +331,24 @@ async def get_ai_response(
         cleaned: list = []
         last_role = None
         for m in conversation_history[-10:]:
-            if m.role == "user":
+            # Normalize roles
+            role = m.role if m.role in ["user", "assistant"] else "user"
+            
+            if role == "user":
                 cleaned.append({"role": "user", "content": m.content})
                 last_role = "user"
-            elif m.role == "assistant" and last_role == "user":
+            elif role == "assistant" and last_role == "user":
                 cleaned.append({"role": "assistant", "content": m.content})
                 last_role = "assistant"
         messages = cleaned
-    messages.append({"role": "user", "content": message})
+    
+    # Ensure we don't duplicate the last user message if frontend sent it in history
+    if not messages or (messages and messages[-1]["role"] == "assistant"):
+        messages.append({"role": "user", "content": message})
 
     try:
-        response_text = await asyncio.to_thread(_sync_chat, messages, system)
+        # Use Agent Loop instead of direct sync_chat
+        response_text = await _agent_loop(messages, system, tools_enabled=True)
         return {
             "response": response_text,
             "language": language,
@@ -160,6 +359,63 @@ async def get_ai_response(
         logger.error("sarvam_chat_failed", error=str(exc), message_preview=message[:80])
         # Re-raise so the FastAPI route returns a proper 502, not a silent demo response
         raise
+
+
+# ---------------------------------------------------------------------------
+# Text-to-Speech  (Sarvam TTS → base64 WAV)
+# ---------------------------------------------------------------------------
+
+def _sync_tts(text: str, language: str) -> Optional[bytes]:
+    """Call Sarvam TTS synchronously; returns raw audio bytes or None."""
+    client = _get_sarvam_client()
+    if not client:
+        return None
+    try:
+        sarvam_lang = SARVAM_LANG.get(language, "en-IN")
+        # Sarvam TTS: text_to_speech endpoint
+        response = client.text_to_speech.convert(
+            inputs=[text[:500]],  # cap at 500 chars per request
+            target_language_code=sarvam_lang,
+            speaker="meera",      # female Indian voice; works for all 10 Indic langs
+            model="bulbul:v1",
+            enable_preprocessing=True,
+        )
+        # SDK may return bytes directly or a response object
+        if isinstance(response, (bytes, bytearray)):
+            return bytes(response)
+        # Some SDK versions return object with .audios list
+        if hasattr(response, "audios") and response.audios:
+            audio = response.audios[0]
+            if isinstance(audio, (bytes, bytearray)):
+                return bytes(audio)
+            if isinstance(audio, str):
+                # already base64
+                import base64
+                return base64.b64decode(audio)
+        if isinstance(response, dict):
+            audios = response.get("audios", [])
+            if audios:
+                import base64
+                return base64.b64decode(audios[0]) if isinstance(audios[0], str) else audios[0]
+        return None
+    except Exception as exc:
+        logger.warning("sarvam_tts_failed", error=str(exc), language=language)
+        return None
+
+
+async def generate_tts_audio(text: str, language: str = "en") -> Optional[str]:
+    """Generate TTS audio for the given text; returns base64-encoded WAV or None."""
+    import base64
+    # Strip markdown formatting before TTS
+    import re
+    clean = re.sub(r"[*#_`>~\[\]()]", "", text)
+    clean = re.sub(r"\n+", " ", clean).strip()
+    if not clean:
+        return None
+    audio_bytes = await asyncio.to_thread(_sync_tts, clean[:500], language)
+    if audio_bytes:
+        return base64.b64encode(audio_bytes).decode("utf-8")
+    return None
 
 
 # ---------------------------------------------------------------------------

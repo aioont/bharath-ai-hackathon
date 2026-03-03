@@ -1,10 +1,10 @@
 import httpx
-import structlog
+import logging
 import random
 from datetime import datetime, timedelta
 from typing import Optional
 
-logger = structlog.get_logger()
+logger = logging.getLogger(__name__)
 
 # Sample commodity MSP (Minimum Support Prices) for 2024-25
 MSP_PRICES = {
@@ -39,15 +39,21 @@ DEMO_COMMODITIES = [
 
 
 async def get_market_prices(
-    state: Optional[str] = None,
-    commodity: Optional[str] = None,
+    commodity_id: int = 3,
+    state_id: int = 17,
+    from_date: str = "",
+    to_date: str = "",
     language: str = "en",
 ) -> dict:
-    """Get commodity market prices. Tries eNAM API first, falls back to demo data."""
+    """Get commodity market prices from AGMARKNET API."""
     
     try:
-        # Try to fetch from a real API (using data.gov.in if available)
-        prices = await _fetch_from_api(state, commodity)
+        prices = await _fetch_from_agmarknet(
+            commodity_id=commodity_id,
+            state_id=state_id,
+            from_date=from_date,
+            to_date=to_date
+        )
         if prices:
             return {
                 "prices": prices,
@@ -55,9 +61,21 @@ async def get_market_prices(
                 "total_count": len(prices),
             }
     except Exception as e:
-        logger.warning("Market API fetch failed, using demo data", error=str(e))
+        logger.warning("AGMARKNET API fetch failed, using demo data: %s", str(e))
     
-    return _get_demo_prices(state, commodity)
+    # Lookup commodity name for filtering demo data
+    commodity_name = "Rice" # default
+    try:
+        filters = load_agmarknet_filters()
+        commodities = filters.get("data", {}).get("cmdt_data", [])
+        for c in commodities:
+            if c.get("cmdt_id") == commodity_id:
+                commodity_name = c.get("cmdt_name", "Rice")
+                break
+    except:
+        pass
+        
+    return _get_demo_prices(commodity_name)
 
 
 async def get_market_trends(commodity: str, days: int = 30) -> dict:
@@ -77,62 +95,157 @@ async def get_market_trends(commodity: str, days: int = 30) -> dict:
         
         return {"dates": dates, "prices": prices, "commodity": commodity}
     except Exception as e:
-        logger.error("Market trends error", error=str(e))
+        logger.error("Market trends error: %s", str(e))
         return {"dates": [], "prices": [], "commodity": commodity}
 
 
-async def _fetch_from_api(state: Optional[str], commodity: Optional[str]) -> list:
-    """Fetch from data.gov.in API (free, no auth required for public datasets)."""
+from app.services.agmarknet_filters_service import load_agmarknet_filters
+
+async def _fetch_from_agmarknet(
+    commodity_id: int = 3,
+    state_id: int = 17,
+    from_date: str = "",
+    to_date: str = ""
+) -> list:
+    """Fetch live data from AGMARKNET API (daily price/arrival report)."""
+    today = datetime.now()
+    yesterday = today - timedelta(days=1)
+    
+    # Use provided dates or default to yesterday-today
+    if not from_date:
+        from_date = yesterday.strftime("%Y-%m-%d")
+    if not to_date:
+        to_date = today.strftime("%Y-%m-%d")
+    
+    # Determine group ID for the commodity
+    group_id = "1" # Default to Cereals
     try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            params = {
-                "api-key": "579b464db66ec23bdd000001cdd3946e44ce4aae38d4521d4038f5a",
-                "format": "json",
-                "limit": 100,
-            }
-            if state:
-                params["filters[State]"] = state
-            if commodity:
-                params["filters[Commodity]"] = commodity
-            
-            resp = await client.get(
-                "https://api.data.gov.in/resource/9ef84268-d588-465a-a308-a864a43d0070",
-                params=params,
-            )
-            data = resp.json()
-            
-            if "records" not in data:
-                return []
-            
-            prices = []
-            today = datetime.now().strftime("%Y-%m-%d")
-            for record in data["records"][:50]:
-                try:
-                    min_p = float(record.get("Min_x0020_Price", 0))
-                    max_p = float(record.get("Max_x0020_Price", 0))
-                    modal_p = float(record.get("Modal_x0020_Price", 0))
-                    if modal_p > 0:
-                        prices.append({
-                            "commodity": record.get("Commodity", ""),
-                            "variety": record.get("Variety", "General"),
-                            "market": record.get("Market", ""),
-                            "state": record.get("State", ""),
-                            "min_price": min_p,
-                            "max_price": max_p,
-                            "modal_price": modal_p,
-                            "unit": "Quintal",
-                            "date": today,
-                            "trend": "stable",
-                            "trend_percentage": 0.0,
-                        })
-                except (ValueError, KeyError):
-                    continue
-            return prices
-    except Exception:
+        filters = load_agmarknet_filters()
+        commodities = filters.get("data", {}).get("cmdt_data", [])
+        for c in commodities:
+            if c.get("cmdt_id") == commodity_id:
+                group_id = str(c.get("cmdt_group_id", "1"))
+                break
+    except Exception as e:
+        logger.warning(f"Failed to lookup group ID for commodity {commodity_id}: {e}")
+
+    # Use the daily-price-arrival API endpoint
+    url = "https://api.agmarknet.gov.in/v1/daily-price-arrival/report"
+    params = {
+        "from_date": from_date,
+        "to_date": to_date,
+        "data_type": "100004",      # price data
+        "group": group_id,          # dynamic group ID
+        "commodity": str(commodity_id),
+        "state": f"[{state_id}]",
+        "district": "[100001]",     # all districts
+        "market": "[100002]",       # all markets
+        "grade": "[100003]",        # all grades
+        "variety": "[100007]",      # all varieties
+        "page": "1",
+        "limit": "200",             # fetch more records
+    }
+    
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(url, params=params)
+            resp.raise_for_status()
+            body = resp.json()
+    except Exception as e:
+        logger.warning("AGMARKNET HTTP error: %s", e)
         return []
+    
+    # New API structure: data.records[0].data is array of price records
+    if not body.get("status"):
+        logger.warning("AGMARKNET API returned status=false")
+        return []
+    
+    data_obj = body.get("data", {})
+    record_wrapper = data_obj.get("records", [])
+    
+    if not record_wrapper or len(record_wrapper) == 0:
+        logger.info("No records in AGMARKNET response")
+        return []
+    
+    # The actual data is in records[0].data
+    price_records = record_wrapper[0].get("data", [])
+    
+    if not price_records:
+        return []
+    
+    prices = []
+    
+    for rec in price_records:
+        try:
+            cmdt = rec.get("cmdt_name", "").strip()
+            if not cmdt:
+                continue
+            
+            rec_state = rec.get("state_name", "").strip()
+            
+            # Parse prices - remove commas and convert to float
+            min_price_str = str(rec.get("min_price", "0")).replace(",", "")
+            max_price_str = str(rec.get("max_price", "0")).replace(",", "")
+            modal_price_str = str(rec.get("model_price", "0")).replace(",", "")  # Note: "model_price" not "modal_price"
+            
+            min_p = float(min_price_str) if min_price_str else 0
+            max_p = float(max_price_str) if max_price_str else 0
+            modal_p = float(modal_price_str) if modal_price_str else 0
+            
+            if modal_p <= 0:
+                continue
+            
+            # If min/max missing, estimate from modal
+            if min_p <= 0:
+                min_p = round(modal_p * 0.96, 2)
+            if max_p <= 0:
+                max_p = round(modal_p * 1.04, 2)
+            
+            # Generate trend (we don't have historical data, so randomize slightly)
+            import random
+            trend_pct = random.uniform(-3.0, 5.0)  # Realistic range
+            if trend_pct > 1.0:
+                trend = "up"
+            elif trend_pct < -1.0:
+                trend = "down"
+            else:
+                trend = "stable"
+            
+            market_name = rec.get("market_name", "Market").strip()
+            district_name = rec.get("district_name", "").strip()
+            variety_name = rec.get("variety_name", "General").strip()
+            arrival_date = rec.get("arrival_date", to_date).strip()
+            
+            # Convert date format from DD-MM-YYYY to YYYY-MM-DD
+            try:
+                if "-" in arrival_date and len(arrival_date.split("-")[0]) == 2:
+                    parts = arrival_date.split("-")
+                    arrival_date = f"{parts[2]}-{parts[1]}-{parts[0]}"
+            except:
+                arrival_date = to_date
+            
+            prices.append({
+                "commodity": cmdt,
+                "variety": variety_name,
+                "market": f"{market_name}, {district_name}" if district_name else market_name,
+                "state": rec_state,
+                "min_price": min_p,
+                "max_price": max_p,
+                "modal_price": modal_p,
+                "unit": rec.get("unit_name_price", "Quintal").replace("Rs./", ""),
+                "date": arrival_date,
+                "trend": trend,
+                "trend_percentage": round(trend_pct, 1),
+            })
+        except Exception as row_err:
+            logger.debug("Skipping malformed AGMARKNET row: %s", row_err)
+            continue
+    
+    logger.info("AGMARKNET: fetched %d records (after filter)", len(prices))
+    return prices
 
 
-def _get_demo_prices(state: Optional[str] = None, commodity: Optional[str] = None) -> dict:
+def _get_demo_prices(filter_commodity: str = None) -> dict:
     """Return demo price data."""
     today = datetime.now().strftime("%Y-%m-%d")
     
@@ -140,11 +253,14 @@ def _get_demo_prices(state: Optional[str] = None, commodity: Optional[str] = Non
     for item in DEMO_COMMODITIES:
         name, variety, market, item_state, min_p, max_p, modal_p, trend, pct = item
         
-        if state and state.lower() not in item_state.lower():
-            continue
-        if commodity and commodity.lower() not in name.lower():
-            continue
-        
+        # Filter if commodity is specified
+        if filter_commodity and filter_commodity.lower() != name.lower():
+            # If we have a filter but it doesn't match, we might skip
+            # Unless we want to show everything if exact match not found?
+            # Let's simple check for substring match or exact match
+            if filter_commodity.lower() not in name.lower() and name.lower() not in filter_commodity.lower():
+                continue
+
         prices.append({
             "commodity": name,
             "variety": variety,

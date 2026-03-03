@@ -1,10 +1,8 @@
 import { useState, useEffect } from 'react'
-import { Search, TrendingUp, TrendingDown, Minus, RefreshCw, MapPin, Filter } from 'lucide-react'
-import { getMarketPrices } from '@/services/api'
+import { Search, TrendingUp, TrendingDown, Minus, RefreshCw, MapPin, Calendar } from 'lucide-react'
+import { getMarketPrices, getMarketFilters } from '@/services/api'
 import type { MarketPrice } from '@/services/api'
-import LoadingSpinner, { SkeletonList } from '@/components/LoadingSpinner'
-import { MARKET_STATES, CROP_CATEGORIES } from '@/utils/constants'
-import { useAppContext } from '@/context/AppContext'
+import { SkeletonList } from '@/components/LoadingSpinner'
 
 // Demo data
 const DEMO_PRICES: MarketPrice[] = [
@@ -21,19 +19,69 @@ const DEMO_PRICES: MarketPrice[] = [
 ]
 
 export default function MarketPrices() {
-  const { state } = useAppContext()
-  const profile = state.userProfile
   const [prices, setPrices] = useState<MarketPrice[]>(DEMO_PRICES)
   const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState('')
-  const [selectedState, setSelectedState] = useState(profile?.state || '')
+  
+  // Filter data from API
+  const [commodities, setCommodities] = useState<Array<{ cmdt_id: number; cmdt_name: string }>>([])
+  const [states, setStates] = useState<Array<{ state_id: number; state_name: string }>>([])
+  const [filtersLoading, setFiltersLoading] = useState(true)
+  
+  // Filter states
+  const [selectedCommodityId, setSelectedCommodityId] = useState<number>(3) // 3 = all commodities
+  const [selectedStateId, setSelectedStateId] = useState<number>(17) // 17 = all states (Kerala by default as per API)
+  const [fromDate, setFromDate] = useState('')
+  const [toDate, setToDate] = useState('')
+  
   const [sortBy, setSortBy] = useState<'commodity' | 'modal_price' | 'trend_percentage'>('commodity')
   const [lastUpdated, setLastUpdated] = useState(new Date())
+
+  // Fetch filters on mount
+  useEffect(() => {
+    const loadFilters = async () => {
+      try {
+        const filters = await getMarketFilters()
+        setCommodities(filters.data.cmdt_data || [])
+        setStates(filters.data.state_data || [])
+      } catch (err) {
+        console.error('Failed to load filters:', err)
+        // Set fallback data if API fails
+        setCommodities([
+          { cmdt_id: 3, cmdt_name: 'Rice' },
+          { cmdt_id: 1, cmdt_name: 'Wheat' },
+          { cmdt_id: 23, cmdt_name: 'Onion' },
+        ])
+        setStates([
+          { state_id: 100000, state_name: 'All States' },
+          { state_id: 17, state_name: 'Kerala' },
+        ])
+      } finally {
+        setFiltersLoading(false)
+      }
+    }
+    loadFilters()
+  }, [])
+
+  // Set default dates (yesterday and today)
+  useEffect(() => {
+    const today = new Date()
+    const yesterday = new Date(today)
+    yesterday.setDate(yesterday.getDate() - 1)
+    
+    setToDate(today.toISOString().split('T')[0])
+    setFromDate(yesterday.toISOString().split('T')[0])
+  }, [])
 
   const fetchPrices = async () => {
     setLoading(true)
     try {
-      const data = await getMarketPrices(selectedState || undefined)
+      const data = await getMarketPrices(
+        selectedCommodityId,
+        selectedStateId,
+        fromDate,
+        toDate
+      )
       setPrices(data.prices)
       setLastUpdated(new Date(data.last_updated))
     } catch (_) {
@@ -42,8 +90,6 @@ export default function MarketPrices() {
       setLoading(false)
     }
   }
-
-  useEffect(() => { fetchPrices() }, [selectedState])
 
   const filtered = prices
     .filter((p) =>
@@ -112,17 +158,91 @@ export default function MarketPrices() {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <div className="flex gap-3">
-          <div className="flex-1">
+        
+        {/* Main Filters Row */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          {/* Commodity Dropdown */}
+          <div>
             <select
               className="select-field text-sm py-2.5"
-              value={selectedState}
-              onChange={(e) => setSelectedState(e.target.value)}
+              value={selectedCommodityId}
+              onChange={(e) => setSelectedCommodityId(Number(e.target.value))}
+              disabled={filtersLoading}
             >
-              <option value="">📍 All States</option>
-              {MARKET_STATES.map((s) => <option key={s} value={s}>{s}</option>)}
+              {/* If loading, show placeholder */}
+              {commodities.length === 0 && <option value={3}>Loading...</option>}
+              
+              {commodities.map((c) => (
+                <option key={c.cmdt_id} value={c.cmdt_id}>
+                  {c.cmdt_name}
+                </option>
+              ))}
             </select>
           </div>
+
+          {/* State Dropdown */}
+          <div>
+            <select
+              className="select-field text-sm py-2.5"
+              value={selectedStateId}
+              onChange={(e) => setSelectedStateId(Number(e.target.value))}
+              disabled={filtersLoading}
+            >
+              <option value={100000}>📍 All States</option>
+              {states.map((s) => (
+                <option key={s.state_id} value={s.state_id}>
+                  {s.state_id === 100000 ? '' : s.state_name}
+                </option>
+              )).filter(option => option.props.children !== '')}
+            </select>
+          </div>
+
+          {/* From Date */}
+          <div className="relative">
+            <Calendar size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+            <input
+              type="date"
+              className="select-field text-sm py-2.5 pl-9"
+              value={fromDate}
+              onChange={(e) => setFromDate(e.target.value)}
+              max={toDate}
+            />
+          </div>
+
+          {/* To Date */}
+          <div className="relative">
+            <Calendar size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+            <input
+              type="date"
+              className="select-field text-sm py-2.5 pl-9"
+              value={toDate}
+              onChange={(e) => setToDate(e.target.value)}
+              min={fromDate}
+              max={new Date().toISOString().split('T')[0]}
+            />
+          </div>
+        </div>
+
+        {/* Submit Button and Sort */}
+        <div className="flex gap-3 items-center">
+          <button
+            onClick={fetchPrices}
+            disabled={loading || !fromDate || !toDate}
+            className="btn-primary px-6 py-2.5 text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {loading ? (
+              <>
+                <RefreshCw size={16} className="animate-spin" />
+                Loading...
+              </>
+            ) : (
+              <>
+                <Search size={16} />
+                Search Prices
+              </>
+            )}
+          </button>
+          
           <div className="flex-1">
             <select
               className="select-field text-sm py-2.5"
@@ -133,6 +253,9 @@ export default function MarketPrices() {
               <option value="modal_price">Sort: Price ↑</option>
               <option value="trend_percentage">Sort: Trending</option>
             </select>
+          </div>
+          <div className="text-xs text-gray-500">
+            {filtered.length} result{filtered.length !== 1 ? 's' : ''}
           </div>
         </div>
       </div>

@@ -4,6 +4,11 @@ pydantic>=2.6
 pydantic-settings>=2.1
 python-multipart>=0.0.9
 python-dotenv>=1.0
+# Auth
+python-jose[cryptography]>=3.3
+passlib[bcrypt]>=1.7
+bcrypt>=3.1,<4.0
+email-validator>=2.1
 # Sarvam AI SDK (chat, translate, vision)
 sarvamai>=0.1.0
 # AWS — S3 image uploads + ElastiCache Redis only
@@ -22,3 +27,6 @@ tenacity>=8.2
 structlog>=24.1
 prometheus-client>=0.19
 mangum>=0.17
+PyYAML>=6.0
+mem0ai>=0.1.31
+deepeval>=1.4.0

@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useReducer, useEffect, ReactNode } from 'react'
 import { SUPPORTED_LANGUAGES } from '@/utils/constants'
+import type { AuthUser } from '@/services/api'
 
 export interface Language {
   code: string
@@ -9,14 +10,26 @@ export interface Language {
   script: string
 }
 
+export interface FarmerCrop {
+  id: string
+  user_id: string
+  crop_name: string
+  area_acres?: number
+  soil_type?: string
+  season?: 'kharif' | 'rabi' | 'zaid' | 'perennial' | 'all-season'
+  irrigation?: 'rainfed' | 'canal' | 'drip' | 'sprinkler' | 'borewell' | 'other'
+  variety?: string
+  notes?: string
+  is_primary: boolean
+  created_at: string
+  updated_at: string
+}
+
 export interface UserProfile {
   name: string
   phone: string
   state: string
   district: string
-  primaryCrop: string
-  soilType: string
-  farmSizeAcres: number
   farmingType: 'organic' | 'conventional' | 'mixed'
   isProfileComplete: boolean
 }
@@ -40,7 +53,7 @@ export const GREETINGS: Record<string, string> = {
 export const UI_LABELS: Record<string, Record<string, string>> = {
   en: {
     // Nav / Sidebar
-    askExpert: 'Ask AI Expert', translateNow: 'Translate Now', features: 'Features', yourFarm: 'Your Farm',
+    askExpert: 'Ask AgriSaarthi', translateNow: 'Translate Now', features: 'Features', yourFarm: 'Your Farm',
     community: 'Community', settings: 'Settings', help: 'Help', profile: 'My Profile',
     // Weather
     weatherTitle: 'Weather & Forecasts', weatherSubtitle: 'Localized weather with farming-specific insights',
@@ -54,7 +67,7 @@ export const UI_LABELS: Record<string, Record<string, string>> = {
     posting: 'Posting...', post: 'Post Question', cancel: 'Cancel',
     // Common
     loading: 'Loading...', online: 'Online', offline: 'Offline',
-    chatTitle: 'AI Expert Chat', marketTitle: 'Market Prices', translateTitle: 'Translate',
+    chatTitle: 'AgriSaarthi', marketTitle: 'Market Prices', translateTitle: 'Translate',
   },
   hi: {
     askExpert: 'AI विशेषज्ञ से पूछें', translateNow: 'अभी अनुवाद करें', features: 'विशेषताएं', yourFarm: 'आपका खेत',
@@ -193,6 +206,8 @@ export { getUILabel }
 interface AppState {
   selectedLanguage: Language
   userProfile: UserProfile | null
+  authUser: AuthUser | null
+  authToken: string | null
   isOnline: boolean
   installPromptEvent: BeforeInstallPromptEvent | null
   isInstalled: boolean
@@ -204,6 +219,8 @@ interface AppState {
 type AppAction =
   | { type: 'SET_LANGUAGE'; payload: Language }
   | { type: 'SET_PROFILE'; payload: UserProfile | null }
+  | { type: 'SET_AUTH'; payload: { user: AuthUser; token: string } }
+  | { type: 'LOGOUT' }
   | { type: 'SET_ONLINE'; payload: boolean }
   | { type: 'SET_INSTALL_PROMPT'; payload: BeforeInstallPromptEvent | null }
   | { type: 'SET_INSTALLED'; payload: boolean }
@@ -222,6 +239,8 @@ interface BeforeInstallPromptEvent extends Event {
 const initialState: AppState = {
   selectedLanguage: SUPPORTED_LANGUAGES[0],
   userProfile: null,
+  authUser: null,
+  authToken: null,
   isOnline: navigator.onLine,
   installPromptEvent: null,
   isInstalled: window.matchMedia('(display-mode: standalone)').matches,
@@ -236,6 +255,10 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, selectedLanguage: action.payload }
     case 'SET_PROFILE':
       return { ...state, userProfile: action.payload }
+    case 'SET_AUTH':
+      return { ...state, authUser: action.payload.user, authToken: action.payload.token }
+    case 'LOGOUT':
+      return { ...state, authUser: null, authToken: null }
     case 'SET_ONLINE':
       return { ...state, isOnline: action.payload }
     case 'SET_INSTALL_PROMPT':
@@ -262,6 +285,8 @@ interface AppContextValue {
   dispatch: React.Dispatch<AppAction>
   setLanguage: (lang: Language) => void
   setProfile: (profile: UserProfile | null) => void
+  setAuth: (user: AuthUser, token: string) => void
+  logout: () => void
   installApp: () => Promise<void>
   t: (key: string) => string
 }
@@ -278,13 +303,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const lang = JSON.parse(savedLang)
         dispatch({ type: 'SET_LANGUAGE', payload: lang })
         document.documentElement.lang = lang.code
-      } catch (_) {}
+      } catch (_) { }
     }
     const savedProfile = localStorage.getItem('userProfile')
     if (savedProfile) {
       try {
         dispatch({ type: 'SET_PROFILE', payload: JSON.parse(savedProfile) })
-      } catch (_) {}
+      } catch (_) { }
+    }
+    const savedToken = localStorage.getItem('auth_token')
+    const savedAuthUser = localStorage.getItem('auth_user')
+    if (savedToken && savedAuthUser) {
+      try {
+        dispatch({ type: 'SET_AUTH', payload: { user: JSON.parse(savedAuthUser), token: savedToken } })
+      } catch (_) { }
     }
   }, [])
 
@@ -327,6 +359,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  const setAuth = (user: AuthUser, token: string) => {
+    dispatch({ type: 'SET_AUTH', payload: { user, token } })
+    localStorage.setItem('auth_token', token)
+    localStorage.setItem('auth_user', JSON.stringify(user))
+  }
+
+  const logout = () => {
+    dispatch({ type: 'LOGOUT' })
+    localStorage.removeItem('auth_token')
+    localStorage.removeItem('auth_user')
+  }
+
   const t = (key: string): string => getUILabel(state.selectedLanguage.code, key)
 
   const installApp = async () => {
@@ -341,7 +385,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AppContext.Provider value={{ state, dispatch, setLanguage, setProfile, installApp, t }}>
+    <AppContext.Provider value={{ state, dispatch, setLanguage, setProfile, setAuth, logout, installApp, t }}>
       {children}
     </AppContext.Provider>
   )

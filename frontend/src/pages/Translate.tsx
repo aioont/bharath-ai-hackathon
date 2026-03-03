@@ -19,20 +19,12 @@ const QUICK_PHRASES = [
   'What are the symptoms of rust disease in wheat?',
 ]
 
-const DOMAIN_OPTIONS = [
-  { value: 'agriculture', label: '🌾 Agriculture' },
-  { value: 'market', label: '📈 Market' },
-  { value: 'weather', label: '⛅ Weather' },
-  { value: 'general', label: '💬 General' },
-]
-
 export default function Translate() {
   const { state } = useAppContext()
   const [inputText, setInputText] = useState('')
   const [outputText, setOutputText] = useState('')
   const [sourceLang, setSourceLang] = useState('en')
   const [targetLang, setTargetLang] = useState(state.selectedLanguage.code)
-  const [domain, setDomain] = useState<'agriculture' | 'general' | 'market' | 'weather'>('agriculture')
   const [loading, setLoading] = useState(false)
   const [confidence, setConfidence] = useState<number | null>(null)
   const charLimit = 2000
@@ -52,7 +44,6 @@ export default function Translate() {
         text: inputText.trim(),
         source_language: sourceLang,
         target_language: targetLang,
-        domain,
       }
       const result = await translateText(req)
       setOutputText(result.translated_text)
@@ -109,25 +100,6 @@ export default function Translate() {
         </p>
       </div>
 
-      {/* Domain Selector */}
-      <div>
-        <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 block">Translation Domain</label>
-        <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
-          {DOMAIN_OPTIONS.map((opt) => (
-            <button
-              key={opt.value}
-              onClick={() => setDomain(opt.value as typeof domain)}
-              className={`flex-shrink-0 px-4 py-2 rounded-xl text-sm font-medium border-2 transition-all ${
-                domain === opt.value
-                  ? 'bg-primary-600 text-white border-primary-600'
-                  : 'bg-white text-gray-600 border-gray-200 hover:border-primary-300'
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
-      </div>
 
       {/* Language Pair */}
       <div className="flex items-end gap-3">

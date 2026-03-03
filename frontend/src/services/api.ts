@@ -14,7 +14,12 @@ api.interceptors.request.use(
       try {
         const parsedLang = JSON.parse(lang)
         config.headers['X-User-Language'] = parsedLang.code
-      } catch (_) {}
+      } catch (_) { }
+    }
+    // Attach JWT token if available
+    const token = localStorage.getItem('auth_token')
+    if (token) {
+      config.headers['Authorization'] = `Bearer ${token}`
     }
     return config
   },
@@ -67,11 +72,26 @@ export interface ChatRequest {
   language: string
   conversation_history?: ChatMessage[]
   category?: string
+  tts_enabled?: boolean
   farmer_profile?: {
     state?: string
+    district?: string
+    farming_type?: string
+    // Legacy
     crop?: string
     soil_type?: string
     season?: string
+    // Full crop list
+    crops?: Array<{
+      crop_name: string
+      area_acres?: number
+      soil_type?: string
+      season?: string
+      irrigation?: string
+      variety?: string
+      notes?: string
+      is_primary: boolean
+    }>
   }
 }
 
@@ -83,6 +103,8 @@ export interface ChatResponse {
   suggestions?: string[]
   related_topics?: string[]
   confidence?: number
+  audio_base64?: string   // base64 WAV from Sarvam TTS (present only when tts_enabled=true)
+  audio_format?: string
 }
 
 export const sendChatMessage = (data: ChatRequest) =>
@@ -158,8 +180,27 @@ export interface MarketResponse {
   total_count: number
 }
 
-export const getMarketPrices = (state?: string, commodity?: string, language = 'en') =>
-  api.get<MarketResponse>('/api/market/prices', { params: { state, commodity, language } }).then((r) => r.data)
+export const getMarketPrices = (
+  commodity_id = 3,
+  state_id = 17,
+  from_date = '',
+  to_date = '',
+  language = 'en'
+) =>
+  api.get<MarketResponse>('/api/market/prices', {
+    params: { commodity_id, state_id, from_date, to_date, language }
+  }).then((r) => r.data)
+
+export const getMarketFilters = () =>
+  api.get<{
+    last_updated: string
+    data: {
+      cmdt_data: Array<{ cmdt_id: number; cmdt_name: string; cmdt_group_id: number }>
+      state_data: Array<{ state_id: number; state_name: string }>
+      district_data?: Array<{ district_id: number; district_name: string; state_id: number }>
+      market_data?: Array<{ market_id: number; market_name: string; district_id: number }>
+    }
+  }>('/api/market/filters').then((r) => r.data)
 
 export const getMarketTrends = (commodity: string, days = 30) =>
   api.get<{ dates: string[]; prices: number[]; commodity: string }>('/api/market/trends', {
@@ -189,10 +230,10 @@ export interface ForumListResponse {
   per_page: number
 }
 
-export const getForumPosts = (page = 1, category?: string, language?: string, search?: string) =>
-  api.get<ForumPost[]>('/api/forum/posts', { params: { page, category, language, search } }).then((r) => r.data)
+export const getForumPosts = (page = 1, category?: string, language?: string, search?: string, user_id?: string, user_email?: string) =>
+  api.get<ForumPost[]>('/api/forum/posts', { params: { page, category, language, search, user_id, user_email } }).then((r) => r.data)
 
-export const createForumPost = (data: Partial<ForumPost>) =>
+export const createForumPost = (data: Partial<ForumPost> & { user_id?: string; user_email?: string }) =>
   api.post<ForumPost>('/api/forum/posts', data).then((r) => r.data)
 
 export const getForumPost = (id: string) =>
@@ -201,4 +242,114 @@ export const getForumPost = (id: string) =>
 export const voteForumPost = (id: string) =>
   api.post<{ upvotes: number }>(`/api/forum/posts/${id}/vote`).then((r) => r.data)
 
+export interface ForumAnswer {
+  id: string
+  post_id: string
+  content: string
+  author: string
+  user_id?: string
+  upvotes: number
+  is_accepted: boolean
+  created_at: string
+}
+
+export const getForumAnswers = (postId: string) =>
+  api.get<ForumAnswer[]>(`/api/forum/posts/${postId}/answers`).then((r) => r.data)
+
+export const createForumAnswer = (postId: string, data: { content: string; author: string; user_id?: string; user_email?: string }) =>
+  api.post<ForumAnswer>(`/api/forum/posts/${postId}/answers`, data).then((r) => r.data)
+
+// ─── Authentication ────────────────────────────────────────────────────────────
+export interface AuthUser {
+  id: string
+  email: string
+  full_name?: string
+  is_verified: boolean
+  state?: string
+  district?: string
+  farming_type?: string
+  language?: string
+}
+
+export interface AuthResponse {
+  access_token: string
+  token_type: string
+  user: AuthUser
+}
+
+export const signup = (email: string, password: string, full_name?: string) =>
+  api.post<{ message: string }>('/api/auth/signup', { email, password, full_name }).then((r) => r.data)
+
+export const verifyEmail = (email: string, code: string) =>
+  api.post<AuthResponse>('/api/auth/verify', { email, code }).then((r) => r.data)
+
+export const login = (email: string, password: string) =>
+  api.post<AuthResponse>('/api/auth/login', { email, password }).then((r) => r.data)
+
+export const getMe = () =>
+  api.get<AuthUser>('/api/auth/me').then((r) => r.data)
+
+export const updateProfile = (data: Partial<AuthUser>) =>
+  api.put<AuthUser>('/api/auth/profile', data).then((r) => r.data)
+
+export const resendVerification = (email: string) =>
+  api.post<{ message: string }>('/api/auth/resend-verification', { email }).then((r) => r.data)
+
+// ─── News Feed ─────────────────────────────────────────────────────────────────
+export interface NewsItem {
+  title: string
+  link: string
+  description: string
+  pub_date?: string
+  author?: string
+  image_url?: string
+  guid?: string
+}
+
+export const getNewsFeed = (limit = 6) =>
+  api.get<NewsItem[]>('/api/news/feed', { params: { limit } }).then((r) => r.data)
+
+// ─── Farmer Crops ──────────────────────────────────────────────────────────────
+export interface FarmerCrop {
+  id: string
+  user_id: string
+  crop_name: string
+  area_acres?: number
+  soil_type?: string
+  season?: 'kharif' | 'rabi' | 'zaid' | 'perennial' | 'all-season'
+  irrigation?: 'rainfed' | 'canal' | 'drip' | 'sprinkler' | 'borewell' | 'other'
+  variety?: string
+  notes?: string
+  is_primary: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface CropCreate {
+  crop_name: string
+  area_acres?: number
+  soil_type?: string
+  season?: 'kharif' | 'rabi' | 'zaid' | 'perennial' | 'all-season'
+  irrigation?: 'rainfed' | 'canal' | 'drip' | 'sprinkler' | 'borewell' | 'other'
+  variety?: string
+  notes?: string
+  is_primary?: boolean
+}
+
+export const getCrops = () =>
+  api.get<FarmerCrop[]>('/api/crops').then((r) => r.data)
+
+export const addCrop = (data: CropCreate) =>
+  api.post<FarmerCrop>('/api/crops', data).then((r) => r.data)
+
+export const updateCrop = (cropId: string, data: Partial<CropCreate>) =>
+  api.put<FarmerCrop>(`/api/crops/${cropId}`, data).then((r) => r.data)
+
+export const deleteCrop = (cropId: string) =>
+  api.delete(`/api/crops/${cropId}`)
+
+export const setPrimaryCrop = (cropId: string) =>
+  api.patch<FarmerCrop>(`/api/crops/${cropId}/set-primary`).then((r) => r.data)
+
 export default api
+

@@ -1,4 +1,5 @@
 export const SUPPORTED_LANGUAGES = [
+  { code: 'en', name: 'English', englishName: 'English', flag: '🇬🇧', script: 'Latin' },
   { code: 'hi', name: 'हिंदी', englishName: 'Hindi', flag: '🇮🇳', script: 'Devanagari' },
   { code: 'bn', name: 'বাংলা', englishName: 'Bengali', flag: '🇮🇳', script: 'Bengali' },
   { code: 'te', name: 'తెలుగు', englishName: 'Telugu', flag: '🇮🇳', script: 'Telugu' },
@@ -14,7 +15,6 @@ export const SUPPORTED_LANGUAGES = [
   { code: 'sa', name: 'संस्कृत', englishName: 'Sanskrit', flag: '🇮🇳', script: 'Devanagari' },
   { code: 'ne', name: 'नेपाली', englishName: 'Nepali', flag: '🇳🇵', script: 'Devanagari' },
   { code: 'si', name: 'සිංහල', englishName: 'Sinhala', flag: '🇱🇰', script: 'Sinhala' },
-  { code: 'en', name: 'English', englishName: 'English', flag: '🇬🇧', script: 'Latin' },
 ]
 
 export const CROP_CATEGORIES = [

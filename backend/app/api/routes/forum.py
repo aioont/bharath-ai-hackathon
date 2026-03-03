@@ -17,16 +17,22 @@ router = APIRouter(prefix="/api/forum", tags=["Community Forum"])
 # ---------------------------------------------------------------------------
 
 def _get_conn():
-    """Open a connection to Supabase using the pool URL (IPv4-safe)."""
+    """Open a connection to Supabase using the pool URL."""
     import psycopg2
     import psycopg2.extras
-    return psycopg2.connect(settings.DATABASE_POOL_URL, connect_timeout=10)
+    psycopg2.extras.register_uuid()
+    dsn = settings.DATABASE_POOL_URL
+    if "sslmode" not in dsn:
+        dsn = dsn + ("&" if "?" in dsn else "?") + "sslmode=require"
+    conn = psycopg2.connect(dsn, connect_timeout=10)
+    conn.autocommit = False
+    return conn
 
 
 def _ensure_table():
-    """Create forum_posts table if it does not exist, and seed initial data."""
+    """Ensure forum_posts exists and has user_id / user_email columns."""
     ddl = """
-    CREATE TABLE IF NOT EXISTS forum_posts (
+    CREATE TABLE IF NOT EXISTS public.forum_posts (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         title TEXT NOT NULL,
         content TEXT NOT NULL,
@@ -38,41 +44,41 @@ def _ensure_table():
         answers_count INT NOT NULL DEFAULT 0,
         is_resolved BOOLEAN NOT NULL DEFAULT FALSE,
         tags TEXT[] NOT NULL DEFAULT '{}',
+        user_id UUID,
+        user_email TEXT,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+    DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                       WHERE table_schema='public' AND table_name='forum_posts' AND column_name='user_id') THEN
+            ALTER TABLE public.forum_posts ADD COLUMN user_id UUID;
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                       WHERE table_schema='public' AND table_name='forum_posts' AND column_name='user_email') THEN
+            ALTER TABLE public.forum_posts ADD COLUMN user_email TEXT;
+        END IF;
+    END $$;
     """
-    seed_data = [
-        ("Best practices for wheat cultivation in Punjab", "I've been farming wheat for 20 years. Here are my top tips for maximising yield...", "Harjeet Singh", "crop-management", "en", 42, 2, 8, True, ["wheat", "Punjab", "yield"], "2024-01-15T10:00:00Z"),
-        ("Yellow leaves on tomato plants – what could it be?", "My tomato plants are showing yellow leaves from the bottom. Applied neem oil but no improvement.", "Ramesh Patel", "pest-disease", "en", 28, 0, 5, False, ["tomato", "disease", "yellow leaves"], "2024-01-18T08:30:00Z"),
-        ("What is the MSP for paddy this season?", "Government has announced new MSP rates. Can anyone share the official numbers?", "Suresh Kumar", "market", "en", 35, 1, 3, True, ["paddy", "MSP", "government"], "2024-01-20T14:00:00Z"),
-    ]
     try:
-        with _get_conn() as conn:
+        conn = _get_conn()
+        try:
             with conn.cursor() as cur:
                 cur.execute(ddl)
-                cur.execute("SELECT COUNT(*) FROM forum_posts")
-                count = cur.fetchone()[0]
-                if count == 0:
-                    for row in seed_data:
-                        cur.execute(
-                            """INSERT INTO forum_posts
-                               (title, content, author, category, language, upvotes, downvotes,
-                                answers_count, is_resolved, tags, created_at)
-                               VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
-                            row
-                        )
             conn.commit()
+        finally:
+            conn.close()
         logger.info("forum_posts table ready")
     except Exception as e:
-        logger.warning(f"DB setup skipped (will use in-memory fallback): {e}")
+        logger.warning(f"DB setup note: {e}")
+        raise
 
 
-# Try to set up table at import time
 try:
     _ensure_table()
     _DB_AVAILABLE = True
 except Exception:
     _DB_AVAILABLE = False
+    logger.warning("Forum DB unavailable — using in-memory fallback")
 
 
 # ---------------------------------------------------------------------------
@@ -86,12 +92,15 @@ _posts: list[dict] = [
 
 
 def _row_to_post(row) -> dict:
-    """Convert a psycopg2 DictRow to a plain dict compatible with ForumPost schema."""
-    import psycopg2.extras  # noqa
     d = dict(row)
-    d["id"] = str(d["id"])
-    d["created_at"] = d["created_at"].isoformat() if hasattr(d["created_at"], "isoformat") else str(d["created_at"])
+    d["id"] = str(d["id"]) if d.get("id") else None
+    raw_ts = d.get("created_at")
+    if hasattr(raw_ts, "isoformat"):
+        d["created_at"] = raw_ts.isoformat()
+    elif raw_ts:
+        d["created_at"] = str(raw_ts)
     d["tags"] = list(d.get("tags") or [])
+    d["user_id"] = str(d["user_id"]) if d.get("user_id") else None
     return d
 
 
@@ -105,11 +114,52 @@ class CreatePostRequest(BaseModel):
     category: str = "general"
     language: str = "en"
     tags: list[str] = []
+    user_id: Optional[str] = None
+    user_email: Optional[str] = None
 
 
 class VoteRequest(BaseModel):
     vote_type: str  # "upvote" | "downvote"
     user_id: Optional[str] = None
+
+
+class CreateAnswerRequest(BaseModel):
+    content: str
+    author: str = "Anonymous Farmer"
+    user_id: Optional[str] = None
+    user_email: Optional[str] = None
+
+
+def _ensure_answers_table():
+    ddl = """
+    CREATE TABLE IF NOT EXISTS public.forum_answers (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        post_id UUID NOT NULL REFERENCES public.forum_posts(id) ON DELETE CASCADE,
+        content TEXT NOT NULL,
+        author TEXT NOT NULL DEFAULT 'Anonymous Farmer',
+        user_id UUID,
+        user_email TEXT,
+        upvotes INT NOT NULL DEFAULT 0,
+        is_accepted BOOLEAN NOT NULL DEFAULT FALSE,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    """
+    try:
+        conn = _get_conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(ddl)
+            conn.commit()
+        finally:
+            conn.close()
+        logger.info("forum_answers table ready")
+    except Exception as e:
+        logger.warning(f"forum_answers table setup note: {e}")
+
+try:
+    _ensure_answers_table()
+except Exception:
+    pass
 
 
 # ---------------------------------------------------------------------------
@@ -122,20 +172,29 @@ async def list_forum_posts(
     language: str = Query(default="en"),
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
+    user_id: Optional[str] = Query(default=None, description="Filter by user ID"),
+    user_email: Optional[str] = Query(default=None, description="Filter by user email"),
 ):
     """List community forum posts with filtering and sorting."""
     if _DB_AVAILABLE:
         try:
             import psycopg2.extras
-            with _get_conn() as conn:
+            conn = _get_conn()
+            try:
                 with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-                    conditions = []
+                    conditions: list[str] = []
                     params: list = []
                     if category:
                         conditions.append("category = %s")
                         params.append(category)
                     if sort == "unanswered":
                         conditions.append("answers_count = 0")
+                    if user_id:
+                        conditions.append("user_id = %s::uuid")
+                        params.append(user_id)
+                    if user_email:
+                        conditions.append("user_email = %s")
+                        params.append(user_email)
 
                     where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
                     order = {
@@ -144,18 +203,31 @@ async def list_forum_posts(
                     }.get(sort, "ORDER BY created_at DESC")
 
                     cur.execute(
-                        f"SELECT * FROM forum_posts {where} {order} LIMIT %s OFFSET %s",
+                        f"SELECT * FROM public.forum_posts {where} {order} LIMIT %s OFFSET %s",
                         params + [limit, offset]
                     )
                     rows = cur.fetchall()
-                    return [ForumPost(**_row_to_post(r)) for r in rows]
+                    logger.info(f"Forum: fetched {len(rows)} posts from DB")
+                    result = []
+                    for r in rows:
+                        try:
+                            result.append(ForumPost(**_row_to_post(r)))
+                        except Exception as row_err:
+                            logger.warning("Skipping malformed post row id=%s: %s", r.get('id'), row_err)
+                    return result
+            finally:
+                conn.close()
         except Exception as e:
-            logger.warning(f"DB list failed, falling back to memory: {e}")
+            logger.warning(f"DB list failed — using in-memory fallback: {e}")
 
     # Fallback
     posts = list(_posts)
     if category:
         posts = [p for p in posts if p["category"] == category]
+    if user_id:
+        posts = [p for p in posts if p.get("user_id") == user_id]
+    if user_email:
+        posts = [p for p in posts if p.get("user_email") == user_email]
     if sort == "popular":
         posts.sort(key=lambda p: p["upvotes"], reverse=True)
     elif sort == "unanswered":
@@ -171,20 +243,27 @@ async def create_forum_post(body: CreatePostRequest):
     if _DB_AVAILABLE:
         try:
             import psycopg2.extras
-            with _get_conn() as conn:
+            conn = _get_conn()
+            try:
                 with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
                     cur.execute(
-                        """INSERT INTO forum_posts
-                           (title, content, author, category, language, tags)
-                           VALUES (%s, %s, %s, %s, %s, %s)
+                        """INSERT INTO public.forum_posts
+                           (title, content, author, category, language, tags, user_id, user_email)
+                           VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                            RETURNING *""",
-                        (body.title, body.content, body.author, body.category, body.language, body.tags)
+                        (
+                            body.title, body.content, body.author,
+                            body.category, body.language, body.tags,
+                            body.user_id, body.user_email,
+                        )
                     )
                     row = cur.fetchone()
                 conn.commit()
+            finally:
+                conn.close()
             return ForumPost(**_row_to_post(row))
         except Exception as e:
-            logger.warning(f"DB insert failed, falling back to memory: {e}")
+            logger.warning(f"DB insert failed — using in-memory fallback: {e}")
 
     # Fallback
     post = {
@@ -199,6 +278,8 @@ async def create_forum_post(body: CreatePostRequest):
         "answers_count": 0,
         "is_resolved": False,
         "tags": body.tags,
+        "user_id": body.user_id,
+        "user_email": body.user_email,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     _posts.insert(0, post)
@@ -207,14 +288,16 @@ async def create_forum_post(body: CreatePostRequest):
 
 @router.get("/posts/{post_id}", response_model=ForumPostDetail)
 async def get_forum_post(post_id: str):
-    """Get a single forum post with answers."""
     if _DB_AVAILABLE:
         try:
             import psycopg2.extras
-            with _get_conn() as conn:
+            conn = _get_conn()
+            try:
                 with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-                    cur.execute("SELECT * FROM forum_posts WHERE id = %s", (post_id,))
+                    cur.execute("SELECT * FROM public.forum_posts WHERE id = %s", (post_id,))
                     row = cur.fetchone()
+            finally:
+                conn.close()
             if row:
                 return ForumPostDetail(**_row_to_post(row), answers=[])
         except Exception as e:
@@ -232,20 +315,23 @@ async def vote_forum_post(post_id: str, body: VoteRequest):
     if body.vote_type not in ("upvote", "downvote"):
         raise HTTPException(status_code=400, detail="vote_type must be 'upvote' or 'downvote'")
 
+    col = "upvotes" if body.vote_type == "upvote" else "downvotes"
     if _DB_AVAILABLE:
         try:
-            col = "upvotes" if body.vote_type == "upvote" else "downvotes"
             import psycopg2.extras
-            with _get_conn() as conn:
+            conn = _get_conn()
+            try:
                 with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
                     cur.execute(
-                        f"UPDATE forum_posts SET {col} = {col} + 1 WHERE id = %s RETURNING upvotes, downvotes",
+                        f"UPDATE public.forum_posts SET {col} = {col} + 1 WHERE id = %s RETURNING upvotes",
                         (post_id,)
                     )
                     row = cur.fetchone()
                 conn.commit()
+            finally:
+                conn.close()
             if row:
-                return VoteResponse(post_id=post_id, upvotes=row["upvotes"], downvotes=row["downvotes"])
+                return VoteResponse(upvotes=row["upvotes"])
         except Exception as e:
             logger.warning(f"DB vote failed: {e}")
 
@@ -256,5 +342,101 @@ async def vote_forum_post(post_id: str, body: VoteRequest):
         post["upvotes"] += 1
     else:
         post["downvotes"] += 1
-    return VoteResponse(post_id=post_id, upvotes=post["upvotes"], downvotes=post["downvotes"])
+    return VoteResponse(upvotes=post["upvotes"])
 
+
+# ---------------------------------------------------------------------------
+# Answers endpoints
+# ---------------------------------------------------------------------------
+
+@router.get("/posts/{post_id}/answers")
+async def list_answers(post_id: str):
+    """Return all answers for a given forum post."""
+    # Demo posts have numeric IDs ("1","2","3") — skip DB for those
+    try:
+        uuid.UUID(post_id)
+    except ValueError:
+        return []
+    if _DB_AVAILABLE:
+        try:
+            import psycopg2.extras
+            conn = _get_conn()
+            try:
+                with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                    cur.execute(
+                        "SELECT * FROM public.forum_answers WHERE post_id = %s::uuid "
+                        "ORDER BY is_accepted DESC, upvotes DESC, created_at ASC",
+                        (post_id,)
+                    )
+                    rows = cur.fetchall()
+            finally:
+                conn.close()
+            result = []
+            for r in rows:
+                d = dict(r)
+                d["id"] = str(d["id"])
+                d["post_id"] = str(d["post_id"])
+                d["user_id"] = str(d["user_id"]) if d.get("user_id") else None
+                if hasattr(d.get("created_at"), "isoformat"):
+                    d["created_at"] = d["created_at"].isoformat()
+                result.append(d)
+            return result
+        except Exception as e:
+            logger.exception("DB list_answers failed for post_id=%s: %s", post_id, e)
+    return []
+
+
+@router.post("/posts/{post_id}/answers", status_code=201)
+async def create_answer(post_id: str, body: CreateAnswerRequest):
+    """Post an answer to a forum question."""
+    if not body.content or not body.content.strip():
+        raise HTTPException(status_code=400, detail="Answer content cannot be empty.")
+    if _DB_AVAILABLE:
+        try:
+            import psycopg2.extras
+            conn = _get_conn()
+            try:
+                with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                    cur.execute(
+                        """INSERT INTO public.forum_answers (post_id, content, author, user_id, user_email)
+                           VALUES (%s::uuid, %s, %s, %s::uuid, %s) RETURNING *""",
+                        (
+                            post_id,
+                            body.content.strip(),
+                            body.author,
+                            body.user_id if body.user_id else None,
+                            body.user_email,
+                        )
+                    )
+                    row = dict(cur.fetchone())
+                    # Increment answers_count on the post
+                    cur.execute(
+                        "UPDATE public.forum_posts SET answers_count = answers_count + 1 WHERE id = %s::uuid",
+                        (post_id,)
+                    )
+                conn.commit()
+            finally:
+                conn.close()
+            row["id"] = str(row["id"])
+            row["post_id"] = str(row["post_id"])
+            row["user_id"] = str(row["user_id"]) if row.get("user_id") else None
+            if hasattr(row.get("created_at"), "isoformat"):
+                row["created_at"] = row["created_at"].isoformat()
+            logger.info("Answer saved for post %s by %s", post_id, body.author)
+            return row
+        except Exception as e:
+            logger.exception("DB create_answer failed for post_id=%s: %s", post_id, e)
+            raise HTTPException(status_code=500, detail=f"Could not save answer: {e}")
+    # In-memory fallback
+    answer = {
+        "id": str(uuid.uuid4()),
+        "post_id": post_id,
+        "content": body.content.strip(),
+        "author": body.author,
+        "user_id": body.user_id,
+        "user_email": body.user_email,
+        "upvotes": 0,
+        "is_accepted": False,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    return answer

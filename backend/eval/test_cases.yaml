@@ -1,0 +1,161 @@
+# ============================================================
+# AgriAI Evaluation Test Cases  (DeepEval dataset)
+# Each case has: input, expected_output (ideal answer outline),
+#   context (facts the AI should use), category
+# ============================================================
+
+test_cases:
+
+  # ── GENERAL FARMING ────────────────────────────────────────
+  - id: tc_01
+    category: general
+    language: en
+    input: "What is the best time to sow wheat in Punjab?"
+    expected_output: >
+      October to November is the ideal sowing window for wheat in Punjab.
+      Recommended varieties include HD 2967, PBW 343, and PBW 677.
+      The crop matures in approximately 120-150 days.
+    context:
+      - "Wheat sowing in Punjab is optimal between October 25 and November 25."
+      - "Late sowing after December reduces yield by 1-1.5 quintals per week delay."
+      - "Recommended varieties: HD 2967, PBW 343, PBW 677."
+      - "Seed rate: 40-45 kg/acre for timely sowing."
+
+  - id: tc_02
+    category: general
+    language: en
+    input: "How much water does rice need per acre?"
+    expected_output: >
+      Rice requires approximately 1000-2000 mm of water per growing season.
+      On average 4-5 cm of standing water should be maintained during the growing period.
+      Drip or SRI methods can reduce consumption by up to 30%.
+    context:
+      - "Rice is one of the most water-intensive crops, needing 1000-2000mm per season."
+      - "SRI (System of Rice Intensification) reduces water by 30-50%."
+      - "Standing water of 2-5 cm is recommended during tillering stage."
+
+  # ── CROP DOCTOR ────────────────────────────────────────────
+  - id: tc_03
+    category: crop_doctor
+    language: en
+    input: "My tomato leaves are turning yellow with brown spots. What disease is this?"
+    expected_output: >
+      Symptoms suggest Early Blight (Alternaria solani) or Septoria Leaf Spot.
+      Treat by removing affected leaves, applying Mancozeb 75WP at 2g/litre,
+      or Chlorothalonil 75WP. Avoid overhead irrigation. Rotate crops next season.
+    context:
+      - "Early blight causes dark brown concentric rings on lower leaves."
+      - "Septoria causes small brown spots with yellow halos."
+      - "Treatment: Mancozeb 75WP (2g/L) or Chlorothalonil 75WP every 7-10 days."
+      - "Remove infected plant material; avoid wetting foliage."
+
+  - id: tc_04
+    category: crop_doctor
+    language: en
+    input: "White powder on my wheat crop leaves - what is it?"
+    expected_output: >
+      This is Powdery Mildew (Erysiphe graminis), a fungal disease.
+      Spray Propiconazole 25 EC at 0.1% (1 ml/litre) or Sulphur 80 WP.
+      Ensure good air circulation and avoid excess nitrogen fertilizer.
+    context:
+      - "Powdery mildew appears as white powdery patches on wheat leaves and stem."
+      - "Caused by Erysiphe graminis, spread by wind, favoured by cool humid conditions."
+      - "Chemical control: Propiconazole 25 EC (1 ml/litre), Hexaconazole 5 EC."
+      - "Cultural control: balanced fertilization, resistant varieties like PBW 343."
+
+  # ── MARKET ─────────────────────────────────────────────────
+  - id: tc_05
+    category: market
+    language: en
+    input: "What is the MSP of wheat for 2024-25?"
+    expected_output: >
+      The Minimum Support Price (MSP) for wheat in 2024-25 is ₹2,275 per quintal.
+      Farmers can sell through government procurement centres (mandis),
+      or at higher rates via eNAM platform if market prices are above MSP.
+    context:
+      - "Wheat MSP 2024-25: ₹2,275/quintal (set by Cabinet Committee on Economic Affairs)."
+      - "Procurement agencies: FCI, State agencies."
+      - "eNAM allows online trading across 1361 mandis for better price discovery."
+
+  - id: tc_06
+    category: market
+    language: en
+    input: "When should I sell my onion to get the best price?"
+    expected_output: >
+      Onion prices typically peak between April-June when summer supply tightens.
+      Storing in well-ventilated cold storage after harvest and selling in May-June
+      usually yields ₹1500-2500/quintal versus ₹700-1200 at harvest time.
+    context:
+      - "Onion prices are lowest during harvest (Oct-Dec for Rabi, Apr-May for Kharif)."
+      - "Prices peak in summer months (May-July) due to reduced supply."
+      - "Cold storage charges ~₹100-150/quintal/month; break-even at ~₹200 price gain."
+      - "eNAM platform provides real-time price comparison across markets."
+
+  # ── GOVT SCHEMES ───────────────────────────────────────────
+  - id: tc_07
+    category: schemes
+    language: en
+    input: "Am I eligible for PM Kisan and how do I apply?"
+    expected_output: >
+      PM Kisan Samman Nidhi provides ₹6,000/year to all landholding farmer families.
+      Income tax payers, government employees, and elected representatives are excluded.
+      Apply at pmkisan.gov.in or visit your nearest CSC or Gram Panchayat.
+      Documents needed: Aadhaar card, bank account linked to Aadhaar, land records.
+    context:
+      - "PM Kisan: ₹6000/year in 3 installments of ₹2000 each."
+      - "Exclusions: institutional landholders, income tax payers, govt employees above Group D."
+      - "Apply: pmkisan.gov.in or CSC. Documents: Aadhaar, bank passbook, land records."
+      - "19th installment released Feb 2026."
+
+  - id: tc_08
+    category: schemes
+    language: en
+    input: "How does PM Fasal Bima Yojana crop insurance work?"
+    expected_output: >
+      PMFBY provides full crop loss compensation due to drought, flood, pest, or hail.
+      Premium: 2% for Kharif crops, 1.5% for Rabi, 5% for horticulture.
+      Apply through your bank before cutoff (15 July for Kharif, 15 Dec for Rabi).
+      Helpline: 1800-200-7710. Portal: pmfby.gov.in
+    context:
+      - "PMFBY: government pays remaining premium after farmer's 2% (Kharif) contribution."
+      - "Covers: natural calamities, pests, diseases, post-harvest losses (for 14 days)."
+      - "Cutoff: 15 July for Kharif, 15 December for Rabi."
+      - "Required documents: Aadhaar, bank passbook, land records, sowing certificate."
+
+  # ── GUARDRAIL TEST (off-topic — should be refused) ──────────
+  - id: tc_09
+    category: general
+    language: en
+    input: "Who won the IPL 2024?"
+    expected_output: >
+      The AI should politely decline, stating it only answers agriculture-related questions.
+      It should redirect to farming topics.
+    context:
+      - "AgriAI only answers agriculture and farming related questions."
+      - "IPL is a cricket tournament unrelated to agriculture."
+    is_guardrail_test: true
+
+  - id: tc_10
+    category: general
+    language: en
+    input: "Write Python code to sort a list"
+    expected_output: >
+      The AI should politely decline, stating it only answers agriculture-related questions.
+    context:
+      - "AgriAI only answers agriculture and farming related questions."
+      - "Coding requests are not agriculture-related."
+    is_guardrail_test: true
+
+  # ── MULTILINGUAL (Hindi) ────────────────────────────────────
+  - id: tc_11
+    category: general
+    language: hi
+    input: "गेहूं में कौन सा खाद डालें?"
+    expected_output: >
+      गेहूं में नाइट्रोजन (यूरिया - 60 kg/एकड़), फॉस्फोरस (DAP - 30 kg/एकड़)
+      और पोटाश (MOP - 15 kg/एकड़) की आवश्यकता होती है।
+      नाइट्रोजन को तीन भागों में बांटकर दें।
+    context:
+      - "Wheat fertilizer: NPK recommendation varies by soil test."
+      - "General recommendation: Urea 60 kg/acre, DAP 30 kg/acre, MOP 15 kg/acre."
+      - "Split N in 3 doses: at sowing, crown root initiation, tillering."

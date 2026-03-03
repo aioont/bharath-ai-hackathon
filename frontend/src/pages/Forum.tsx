@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Search, Plus, ThumbsUp, MessageCircle, CheckCircle, Send } from 'lucide-react'
-import { getForumPosts, createForumPost, voteForumPost } from '@/services/api'
-import type { ForumPost } from '@/services/api'
+import { Search, Plus, MessageCircle, CheckCircle, Send, User, ChevronDown, ChevronUp } from 'lucide-react'
+import { getForumPosts, createForumPost, getForumAnswers, createForumAnswer } from '@/services/api'
+import type { ForumPost, ForumAnswer } from '@/services/api'
 import { EXPERT_CATEGORIES, SUPPORTED_LANGUAGES } from '@/utils/constants'
 import { SkeletonList } from '@/components/LoadingSpinner'
 import { useAppContext } from '@/context/AppContext'
+import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 
 const DEMO_POSTS: ForumPost[] = [
@@ -18,7 +19,9 @@ const DEMO_POSTS: ForumPost[] = [
 
 export default function Forum() {
   const { state, t } = useAppContext()
+  const navigate = useNavigate()
   const profile = state.userProfile
+  const authUser = state.authUser
   const [posts, setPosts] = useState<ForumPost[]>(DEMO_POSTS)
   const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState('')
@@ -26,33 +29,30 @@ export default function Forum() {
   const [showNewPost, setShowNewPost] = useState(false)
   const [newPost, setNewPost] = useState({ title: '', content: '', category: '', tags: '' })
   const [submitting, setSubmitting] = useState(false)
-  const [sortBy, setSortBy] = useState<'latest' | 'popular' | 'unanswered'>('latest')
+  const [viewMode, setViewMode] = useState<'all' | 'mine'>('all')
+  const [expandedPostId, setExpandedPostId] = useState<string | null>(null)
+  const [answers, setAnswers] = useState<Record<string, ForumAnswer[]>>({})
+  const [answerText, setAnswerText] = useState('')
+  const [submittingAnswer, setSubmittingAnswer] = useState(false)
 
-  // Load posts from API — extracted as useCallback so it can be called after post creation
-  const loadPosts = useCallback(async () => {
+  const loadPosts = useCallback(async (mode: 'all' | 'mine' = 'all') => {
     setLoading(true)
     try {
-      const data = await getForumPosts()
+      const userId = mode === 'mine' ? authUser?.id : undefined
+      const userEmail = mode === 'mine' ? authUser?.email : undefined
+      const data = await getForumPosts(1, undefined, undefined, undefined, userId, userEmail)
       if (data && data.length > 0) setPosts(data)
+      else if (mode === 'mine') setPosts([])
     } catch (_) {
       // Keep demo posts as fallback silently
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [authUser])
 
   useEffect(() => {
-    loadPosts()
-  }, [loadPosts])
-
-  const handleVote = async (postId: string) => {
-    try {
-      await voteForumPost(postId)
-      setPosts((prev) => prev.map((p) => p.id === postId ? { ...p, upvotes: p.upvotes + 1 } : p))
-    } catch (_) {
-      setPosts((prev) => prev.map((p) => p.id === postId ? { ...p, upvotes: p.upvotes + 1 } : p))
-    }
-  }
+    loadPosts(viewMode)
+  }, [loadPosts, viewMode])
 
   const handleCreatePost = async () => {
     const title = newPost.title.trim()
@@ -82,14 +82,15 @@ export default function Forum() {
       await createForumPost({
         ...newPost,
         language: state.selectedLanguage.code,
-        author: profile?.name || 'Anonymous Farmer',
+        author: authUser?.full_name || profile?.name || 'Anonymous Farmer',
         tags: newPost.tags.split(',').map((t) => t.trim()).filter(Boolean),
+        user_id: authUser?.id,
+        user_email: authUser?.email,
       })
       toast.success('Question posted to the community!')
       setShowNewPost(false)
       setNewPost({ title: '', content: '', category: '', tags: '' })
-      // Reload from DB so the new post is confirmed-persisted data
-      await loadPosts()
+      await loadPosts(viewMode)
     } catch (err) {
       console.error('Failed to create post:', err)
       toast.error('Could not save your post. Please check your connection and try again.')
@@ -98,16 +99,60 @@ export default function Forum() {
     }
   }
 
+  const handleExpandPost = async (postId: string) => {
+    if (expandedPostId === postId) {
+      setExpandedPostId(null)
+      setAnswerText('')
+      return
+    }
+    setExpandedPostId(postId)
+    setAnswerText('')
+    if (!answers[postId]) {
+      try {
+        const data = await getForumAnswers(postId)
+        setAnswers((prev) => ({ ...prev, [postId]: data }))
+      } catch (_) {
+        setAnswers((prev) => ({ ...prev, [postId]: [] }))
+      }
+    }
+  }
+
+  const handleSubmitAnswer = async (postId: string) => {
+    const text = answerText.trim()
+    if (!text || text.length < 10) {
+      toast.error('Please write at least 10 characters in your answer.')
+      return
+    }
+    if (!authUser) {
+      toast.error('Please sign in to answer questions.')
+      navigate('/login')
+      return
+    }
+    setSubmittingAnswer(true)
+    try {
+      const ans = await createForumAnswer(postId, {
+        content: text,
+        author: authUser.full_name || authUser.email,
+        user_id: authUser.id,
+        user_email: authUser.email,
+      })
+      setAnswers((prev) => ({ ...prev, [postId]: [...(prev[postId] || []), ans] }))
+      setPosts((prev) => prev.map((p) => p.id === postId ? { ...p, answers_count: p.answers_count + 1 } : p))
+      setAnswerText('')
+      toast.success('Answer posted!')
+    } catch (_) {
+      toast.error('Could not post your answer. Please try again.')
+    } finally {
+      setSubmittingAnswer(false)
+    }
+  }
+
   const filtered = posts
     .filter((p) =>
       (!search || p.title.toLowerCase().includes(search.toLowerCase()) || p.content.toLowerCase().includes(search.toLowerCase()) || p.tags.some((t) => t.toLowerCase().includes(search.toLowerCase()))) &&
       (!category || p.category === category)
     )
-    .sort((a, b) => {
-      if (sortBy === 'popular') return b.upvotes - a.upvotes
-      if (sortBy === 'unanswered') return a.answers_count - b.answers_count
-      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-    })
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
 
   const langLabel = (code: string) => SUPPORTED_LANGUAGES.find((l) => l.code === code)?.flag || '🌍'
 
@@ -130,13 +175,38 @@ export default function Forum() {
           <p className="text-xs text-gray-500 mt-0.5">{t('forumSubtitle')}</p>
         </div>
         <button
-          onClick={() => setShowNewPost(!showNewPost)}
+          onClick={() => {
+            if (!authUser) {
+              toast.error('Please sign in to post a question.')
+              navigate('/login')
+              return
+            }
+            setShowNewPost(!showNewPost)
+          }}
           className="btn-primary flex items-center gap-2 text-sm py-2.5 px-4"
         >
           <Plus size={16} />
           {t('askQuestion')}
         </button>
       </div>
+
+      {/* My Questions / All Questions Tabs */}
+      {authUser && (
+        <div className="flex gap-2">
+          <button
+            onClick={() => setViewMode('all')}
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${viewMode === 'all' ? 'bg-primary-600 text-white' : 'bg-white text-gray-500 border border-gray-200'}`}
+          >
+            All Questions
+          </button>
+          <button
+            onClick={() => setViewMode('mine')}
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${viewMode === 'mine' ? 'bg-primary-600 text-white' : 'bg-white text-gray-500 border border-gray-200'}`}
+          >
+            <User size={12} /> My Questions
+          </button>
+        </div>
+      )}
 
       {/* New Post Form */}
       {showNewPost && (
@@ -250,19 +320,9 @@ export default function Forum() {
             </button>
           ))}
         </div>
-        <div className="flex gap-2">
-          {(['latest', 'popular', 'unanswered'] as const).map((sort) => (
-            <button
-              key={sort}
-              onClick={() => setSortBy(sort)}
-              className={`flex-shrink-0 px-3 py-1.5 rounded-xl text-xs font-medium border transition-all capitalize ${
-                sortBy === sort ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-500 border-gray-200'
-              }`}
-            >
-              {sort === 'latest' ? '🕒' : sort === 'popular' ? '🔥' : '❓'} {sort}
-            </button>
-          ))}
-          <span className="ml-auto text-xs text-gray-400 self-center">{filtered.length} questions</span>
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-medium text-gray-500">🕒 Sorted by Latest</span>
+          <span className="text-xs text-gray-400">{filtered.length} questions</span>
         </div>
       </div>
 
@@ -281,19 +341,8 @@ export default function Forum() {
             filtered.map((post) => {
               const catInfo = EXPERT_CATEGORIES.find((c) => c.id === post.category)
               return (
-                <div key={post.id} className="card border border-gray-100 hover:border-primary-200 transition-all cursor-pointer hover:shadow-md">
+                <div key={post.id} className="card border border-gray-100 hover:border-primary-200 transition-all hover:shadow-md">
                   <div className="flex items-start gap-3">
-                    {/* Vote Column */}
-                    <div className="flex-shrink-0 flex flex-col items-center gap-1">
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleVote(post.id) }}
-                        className="group flex flex-col items-center gap-0.5 p-2 rounded-xl hover:bg-primary-50 transition-colors"
-                      >
-                        <ThumbsUp size={16} className="text-gray-400 group-hover:text-primary-600 transition-colors" />
-                        <span className="text-xs font-bold text-gray-600 group-hover:text-primary-700">{post.upvotes}</span>
-                      </button>
-                    </div>
-
                     {/* Content */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start gap-2 flex-wrap mb-2">
@@ -329,10 +378,86 @@ export default function Forum() {
                           </span>
                           <span>by {post.author}</span>
                         </div>
-                        <span className="text-xs text-gray-400">{timeAgo(post.created_at)}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-gray-400">{timeAgo(post.created_at)}</span>
+                          <button
+                            onClick={() => handleExpandPost(post.id)}
+                            className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${
+                              expandedPostId === post.id
+                                ? 'bg-primary-600 text-white'
+                                : 'bg-primary-50 text-primary-700 hover:bg-primary-100'
+                            }`}
+                          >
+                            {expandedPostId === post.id ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                            {expandedPostId === post.id ? 'Hide' : 'Answers & Reply'}
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
+
+                  {/* Inline answers + answer form */}
+                  {expandedPostId === post.id && (
+                    <div className="mt-4 pt-4 border-t border-gray-100 space-y-3">
+                      {/* Existing answers */}
+                      {(answers[post.id] || []).length > 0 ? (
+                        <div className="space-y-2">
+                          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                            {(answers[post.id] || []).length} Answer{(answers[post.id] || []).length > 1 ? 's' : ''}
+                          </p>
+                          {(answers[post.id] || []).map((ans) => (
+                            <div
+                              key={ans.id}
+                              className={`p-3 rounded-xl text-sm ${ans.is_accepted ? 'bg-green-50 border border-green-200' : 'bg-gray-50'}`}
+                            >
+                              {ans.is_accepted && (
+                                <div className="flex items-center gap-1 text-green-700 text-xs font-semibold mb-1">
+                                  <CheckCircle size={11} /> Accepted Answer
+                                </div>
+                              )}
+                              <p className="text-gray-800 text-sm leading-relaxed">{ans.content}</p>
+                              <div className="flex items-center gap-3 mt-2 text-xs text-gray-400">
+                                <span>by {ans.author}</span>
+                                <span>{timeAgo(ans.created_at)}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-gray-400 italic">No answers yet — be the first to help!</p>
+                      )}
+
+                      {/* Answer form */}
+                      {authUser ? (
+                        <div className="flex flex-col gap-2 pt-2">
+                          <textarea
+                            rows={3}
+                            placeholder="Write your answer here... (min. 10 characters)"
+                            className="input-field resize-none text-sm"
+                            value={answerText}
+                            onChange={(e) => setAnswerText(e.target.value)}
+                          />
+                          <div className="flex justify-between items-center">
+                            <span className={`text-[11px] ${answerText.trim().length < 10 ? 'text-orange-500' : 'text-green-600'}`}>
+                              {answerText.trim().length < 10 ? `${answerText.trim().length}/10 min` : '✓ Ready to post'}
+                            </span>
+                            <button
+                              onClick={() => handleSubmitAnswer(post.id)}
+                              disabled={submittingAnswer || answerText.trim().length < 10}
+                              className="btn-primary flex items-center gap-1.5 text-xs py-1.5 px-3 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              <Send size={13} />
+                              {submittingAnswer ? 'Posting…' : 'Post Answer'}
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800">
+                          <button onClick={() => navigate('/login')} className="font-semibold underline">Sign in</button> to post an answer.
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )
             })
@@ -340,15 +465,7 @@ export default function Forum() {
         </div>
       )}
 
-      {/* Community Stats */}
-      <div className="card bg-gradient-to-br from-purple-50 to-primary-50 border border-purple-100">
-        <h3 className="font-bold text-gray-900 mb-3">🏆 Community Stats</h3>
-        <div className="grid grid-cols-3 gap-3 text-center">
-          <div><div className="text-xl font-bold text-primary-700">2,847</div><div className="text-xs text-gray-500">Questions</div></div>
-          <div><div className="text-xl font-bold text-primary-700">12,439</div><div className="text-xs text-gray-500">Answers</div></div>
-          <div><div className="text-xl font-bold text-primary-700">5,621</div><div className="text-xs text-gray-500">Farmers</div></div>
-        </div>
-      </div>
+  
     </div>
   )
 }

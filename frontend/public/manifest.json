@@ -29,8 +29,8 @@
       "icons": [{ "src": "/icons/icon-96x96.png", "sizes": "96x96" }]
     },
     {
-      "name": "AI Expert Chat",
-      "short_name": "AI Chat",
+      "name": "AgriSaarthi - AI Agricultural Expert",
+      "short_name": "AgriSaarthi",
       "description": "Chat with AI agricultural expert",
       "url": "/chat",
       "icons": [{ "src": "/icons/icon-96x96.png", "sizes": "96x96" }]
