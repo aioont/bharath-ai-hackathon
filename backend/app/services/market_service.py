@@ -47,6 +47,17 @@ async def get_market_prices(
 ) -> dict:
     """Get commodity market prices from AGMARKNET API."""
     
+    # Check cache first (15-minute TTL for market data)
+    from app.core.cache import cache_get, cache_set, generate_cache_key
+    
+    cache_key = generate_cache_key("market_prices", commodity=commodity_id, state=state_id, from_date=from_date, to_date=to_date)
+    cached = await cache_get(cache_key)
+    
+    if cached:
+        logger.info("market_prices_cache_hit", commodity=commodity_id, state=state_id)
+        import json
+        return json.loads(cached)
+    
     try:
         prices = await _fetch_from_agmarknet(
             commodity_id=commodity_id,
@@ -55,11 +66,17 @@ async def get_market_prices(
             to_date=to_date
         )
         if prices:
-            return {
+            result = {
                 "prices": prices,
                 "last_updated": datetime.utcnow().isoformat(),
                 "total_count": len(prices),
             }
+            
+            # Cache for 15 minutes
+            import json
+            await cache_set(cache_key, json.dumps(result), ttl=900)  # 15 minutes
+            
+            return result
     except Exception as e:
         logger.warning("AGMARKNET API fetch failed, using demo data: %s", str(e))
     

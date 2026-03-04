@@ -351,5 +351,47 @@ export const deleteCrop = (cropId: string) =>
 export const setPrimaryCrop = (cropId: string) =>
   api.patch<FarmerCrop>(`/api/crops/${cropId}/set-primary`).then((r) => r.data)
 
+// ─── Admin Cache Management ────────────────────────────────────────────────────
+export interface CacheStats {
+  available: boolean
+  performance?: {
+    hit_rate?: string
+    cache_hits?: number
+    cache_misses?: number
+  }
+  memory?: {
+    used_memory?: string
+    peak_memory?: string
+    fragmentation_ratio?: string
+  }
+  clients?: {
+    connected_clients?: number
+  }
+  commands?: {
+    total_commands_processed?: number
+  }
+  recommendations?: string[]
+}
+
+export interface CacheHealth {
+  available: boolean
+  message: string
+}
+
+export interface CacheClearResponse {
+  cleared: boolean
+  keys_deleted: number
+  pattern: string
+}
+
+export const getCacheStats = () =>
+  api.get<CacheStats>('/admin/cache/stats').then((r) => r.data)
+
+export const getCacheHealth = () =>
+  api.get<CacheHealth>('/admin/cache/health').then((r) => r.data)
+
+export const clearCache = (pattern = '*') =>
+  api.post<CacheClearResponse>('/admin/cache/clear', null, { params: { pattern } }).then((r) => r.data)
+
 export default api
 

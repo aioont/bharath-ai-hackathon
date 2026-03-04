@@ -1,9 +1,9 @@
 import { NavLink } from 'react-router-dom'
-import { Home, Languages, MessageSquareText, Leaf, TrendingUp, CloudSun, Users } from 'lucide-react'
+import { Home, Languages, Mic, Leaf, TrendingUp, CloudSun, Users } from 'lucide-react'
 
 const bottomNavItems = [
   { to: '/', label: 'Home', icon: Home },
-  { to: '/chat', label: 'AgriSaarthi', icon: MessageSquareText },
+  { to: '/chat', label: 'AgriSaarthi', icon: Mic },
   { to: '/forum', label: 'Forum', icon: Users },
   { to: '/market', label: 'Market', icon: TrendingUp },
   { to: '/translate', label: 'Translate', icon: Languages },

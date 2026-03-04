@@ -227,7 +227,8 @@ async def generate_farm_plan(
 
     messages = [{"role": "user", "content": f"Farm context:\n{context}\n\nGenerate the complete farm plan."}]
 
-    plan_text = await _agent_loop(messages, system, tools_enabled=True)
+    # Disable tools to prevent tool calls in output
+    plan_text = await _agent_loop(messages, system, tools_enabled=False)
 
     audio_b64 = None
     if tts_enabled:

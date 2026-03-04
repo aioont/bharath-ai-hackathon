@@ -1,15 +1,15 @@
 import { useState } from 'react'
 import { NavLink, Link } from 'react-router-dom'
 import {
-  Home, Languages, MessageSquareText, Leaf, TrendingUp,
-  CloudSun, Users, HelpCircle, UserCircle, LogIn, ChevronDown, Check, Shield,
+  Home, Languages, Mic, Leaf, TrendingUp,
+  CloudSun, Users, UserCircle, LogIn, ChevronDown, Check, Shield, Settings,
 } from 'lucide-react'
 import { useAppContext } from '@/context/AppContext'
 import { SUPPORTED_LANGUAGES } from '@/utils/constants'
 
 const navItems = [
   { to: '/', label: 'Home', icon: Home },
-  { to: '/chat', label: 'AgriSaarthi', icon: MessageSquareText },
+  { to: '/chat', label: 'AgriSaarthi', icon: Mic, color: 'text-orange-500' },
   { to: '/forum', label: 'Community Forum', icon: Users },
   { to: '/crop-health', label: 'Crop Health', icon: Leaf },
   { to: '/insurance', label: 'Insurance Advisor', icon: Shield },
@@ -132,13 +132,22 @@ export default function Sidebar() {
       {/* Bottom section */}
       <div className="px-3 pt-4 border-t border-gray-100 space-y-1">
         {authUser && (
-          <NavLink
-            to="/profile"
-            className={({ isActive }) => isActive ? 'nav-link-active' : 'nav-link'}
-          >
-            <UserCircle size={18} />
-            <span className="text-sm">{t('profile')}</span>
-          </NavLink>
+          <>
+            <NavLink
+              to="/profile"
+              className={({ isActive }) => isActive ? 'nav-link-active' : 'nav-link'}
+            >
+              <UserCircle size={18} />
+              <span className="text-sm">{t('profile')}</span>
+            </NavLink>
+            <NavLink
+              to="/admin/eval"
+              className={({ isActive }) => isActive ? 'nav-link-active' : 'nav-link'}
+            >
+              <Settings size={18} />
+              <span className="text-sm">Admin Panel</span>
+            </NavLink>
+          </>
         )}
 
         {/* Farmer profile quick card — only when logged in */}

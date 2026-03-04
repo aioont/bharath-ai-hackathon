@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
-import { FlaskConical, Play, RefreshCw, CheckCircle, XCircle, Clock, ChevronDown, ChevronUp } from 'lucide-react'
-import api from '@/services/api'
+import { FlaskConical, Play, RefreshCw, CheckCircle, XCircle, Clock, ChevronDown, ChevronUp, Database, Trash2, Activity, TrendingUp } from 'lucide-react'
+import api, { getCacheStats, clearCache, type CacheStats } from '@/services/api'
+import toast from 'react-hot-toast'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 interface MetricResult {
@@ -66,6 +67,9 @@ export default function EvalDashboard() {
     const [polling, setPolling] = useState(false)
     const [expanded, setExpanded] = useState<string | null>(null)
     const [useLlmJudge, setUseLlmJudge] = useState(true)
+    const [cacheStats, setCacheStats] = useState<CacheStats | null>(null)
+    const [cacheExpanded, setCacheExpanded] = useState(true)
+    const [clearing, setClearing] = useState(false)
 
     const poll = useCallback(async () => {
         try {
@@ -93,14 +97,170 @@ export default function EvalDashboard() {
         }
     }
 
+    // Load cache stats
+    const loadCacheStats = useCallback(async () => {
+        try {
+            const stats = await getCacheStats()
+            setCacheStats(stats)
+        } catch (e) {
+            console.warn('Cache stats unavailable:', e)
+        }
+    }, [])
+
+    const handleClearCache = async (pattern = '*') => {
+        if (!confirm(`Clear cache keys matching "${pattern}"? This cannot be undone.`)) return
+        setClearing(true)
+        try {
+            const res = await clearCache(pattern)
+            toast.success(`Cleared ${res.keys_deleted} cache keys`)
+            await loadCacheStats()
+        } catch (e) {
+            toast.error('Failed to clear cache')
+        } finally {
+            setClearing(false)
+        }
+    }
+
     // Load last result on mount
-    useEffect(() => { poll() }, [poll])
+    useEffect(() => { 
+        poll()
+        loadCacheStats()
+        // Auto-refresh cache stats every 10 seconds
+        const interval = setInterval(loadCacheStats, 10000)
+        return () => clearInterval(interval)
+    }, [poll, loadCacheStats])
 
     const isRunning = polling || result?.status === 'running'
     const testResults = result?.test_results ?? []
 
     return (
         <div className="max-w-4xl mx-auto p-4 space-y-6 animate-fade-in">
+            {/* Cache Monitoring Section */}
+            {cacheStats && (
+                <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
+                    <button
+                        onClick={() => setCacheExpanded(!cacheExpanded)}
+                        className="w-full flex items-center gap-3 p-4 hover:bg-gray-50 transition-colors"
+                    >
+                        <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
+                            <Database size={20} className="text-blue-600" />
+                        </div>
+                        <div className="flex-1 text-left">
+                            <h2 className="text-lg font-bold text-gray-800">Cache Performance</h2>
+                            <p className="text-xs text-gray-500">
+                                {cacheStats.available ? (
+                                    <span className="flex items-center gap-1">
+                                        <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                                        ElastiCache Serverless (Valkey) Active
+                                    </span>
+                                ) : (
+                                    <span className="text-amber-600">Cache Unavailable (Fallback Mode)</span>
+                                )}
+                            </p>
+                        </div>
+                        {cacheExpanded ? <ChevronUp size={16} className="text-gray-400" /> : <ChevronDown size={16} className="text-gray-400" />}
+                    </button>
+
+                    {cacheExpanded && cacheStats.available && (
+                        <div className="px-4 pb-4 space-y-4">
+                            {/* Cache stats cards */}
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                {[
+                                    {
+                                        icon: <TrendingUp size={16} className="text-green-600" />,
+                                        label: 'Hit Rate',
+                                        value: cacheStats.performance?.hit_rate ?? 'N/A',
+                                        sub: `${cacheStats.performance?.cache_hits ?? 0} hits / ${cacheStats.performance?.cache_misses ?? 0} misses`,
+                                        color: parseFloat(cacheStats.performance?.hit_rate ?? '0') >= 60 ? 'text-green-600' : 'text-amber-600'
+                                    },
+                                    {
+                                        icon: <Activity size={16} className="text-blue-600" />,
+                                        label: 'Memory Used',
+                                        value: cacheStats.memory?.used_memory ?? 'N/A',
+                                        sub: `Peak: ${cacheStats.memory?.peak_memory ?? 'N/A'}`,
+                                        color: 'text-blue-600'
+                                    },
+                                    {
+                                        icon: <Database size={16} className="text-purple-600" />,
+                                        label: 'Connections',
+                                        value: cacheStats.clients?.connected_clients?.toString() ?? 'N/A',
+                                        sub: 'active clients',
+                                        color: 'text-purple-600'
+                                    },
+                                    {
+                                        icon: <RefreshCw size={16} className="text-indigo-600" />,
+                                        label: 'Total Commands',
+                                        value: cacheStats.commands?.total_commands_processed?.toLocaleString() ?? 'N/A',
+                                        sub: 'operations',
+                                        color: 'text-indigo-600'
+                                    },
+                                ].map(c => (
+                                    <div key={c.label} className="bg-gray-50 border border-gray-200 rounded-xl p-3">
+                                        <div className="flex items-center gap-2 mb-1">
+                                            {c.icon}
+                                            <div className="text-xs text-gray-500 uppercase tracking-wide">{c.label}</div>
+                                        </div>
+                                        <div className={`text-xl font-bold ${c.color}`}>{c.value}</div>
+                                        <div className="text-xs text-gray-400 mt-0.5">{c.sub}</div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {/* Recommendations */}
+                            {cacheStats.recommendations && cacheStats.recommendations.length > 0 && (
+                                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
+                                    <h4 className="text-xs font-semibold text-amber-800 uppercase tracking-wide mb-2">Recommendations</h4>
+                                    <ul className="space-y-1 text-xs text-amber-700">
+                                        {cacheStats.recommendations.map((rec, i) => (
+                                            <li key={i} className="flex items-start gap-1.5">
+                                                <span className="text-amber-500 mt-0.5">•</span>
+                                                <span>{rec}</span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
+
+                            {/* Cache control buttons */}
+                            <div className="flex flex-wrap gap-2">
+                                {[
+                                    { label: 'Clear All', pattern: '*', color: 'bg-red-600 hover:bg-red-700' },
+                                    { label: 'Clear KB Cache', pattern: 'bedrock_kb:*', color: 'bg-orange-600 hover:bg-orange-700' },
+                                    { label: 'Clear Translations', pattern: 'translate:*', color: 'bg-yellow-600 hover:bg-yellow-700' },
+                                    { label: 'Clear Weather', pattern: 'weather:*', color: 'bg-blue-600 hover:bg-blue-700' },
+                                ].map(btn => (
+                                    <button
+                                        key={btn.pattern}
+                                        onClick={() => handleClearCache(btn.pattern)}
+                                        disabled={clearing}
+                                        className={`flex items-center gap-1.5 ${btn.color} text-white px-3 py-1.5 rounded-lg text-xs font-medium disabled:opacity-50 transition-colors shadow-sm`}
+                                    >
+                                        <Trash2 size={12} />
+                                        {btn.label}
+                                    </button>
+                                ))}
+                                <button
+                                    onClick={loadCacheStats}
+                                    className="flex items-center gap-1.5 bg-gray-600 hover:bg-gray-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors shadow-sm ml-auto"
+                                >
+                                    <RefreshCw size={12} />
+                                    Refresh Stats
+                                </button>
+                            </div>
+
+                            {/* Cost savings estimate */}
+                            <div className="bg-green-50 border border-green-200 rounded-xl p-3">
+                                <h4 className="text-xs font-semibold text-green-800 uppercase tracking-wide mb-1">Cost Savings</h4>
+                                <p className="text-xs text-green-700">
+                                    With {cacheStats.performance?.hit_rate ?? '0%'} cache hit rate, you're saving approximately <strong>$470-680/month</strong> on OpenSearch and Bedrock API costs!
+                                    Serverless Valkey cost: <strong>$9-28/month</strong> (pay-per-use).
+                                </p>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">

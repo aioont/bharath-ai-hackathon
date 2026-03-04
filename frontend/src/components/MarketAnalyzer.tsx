@@ -25,11 +25,25 @@ interface MarketAnalyzerProps {
     userProfile?: { state?: string }
 }
 
-const COMMODITIES = ['Wheat', 'Rice', 'Maize', 'Cotton', 'Onion', 'Potato', 'Tomato',
-    'Soybean', 'Groundnut', 'Mustard', 'Chilli', 'Turmeric', 'Sugarcane']
+const COMMODITIES = [
+    'Wheat', 'Rice', 'Maize', 'Cotton', 'Onion', 'Potato', 'Tomato', 'Sugarcane',
+    'Soybean', 'Groundnut', 'Mustard', 'Chilli', 'Turmeric', 'Garlic', 'Banana', 'Mango',
+    'Jowar', 'Bajra', 'Barley', 'Gram', 'Arhar', 'Moong', 'Urad', 'Masoor',
+    'Sunflower', 'Safflower', 'Nigerseed', 'Sesamum', 'Coconut', 'Arecanut', 'Cashewnut',
+    'Black Pepper', 'Cardamom', 'Ginger', 'Coriander', 'Cumin', 'Fennel', 'Fenugreek', 'Ajwain',
+    'Guava', 'Pomegranate', 'Papaya', 'Orange', 'Grapes', 'Apple', 'Pineapple', 'Watermelon',
+    'Cabbage', 'Cauliflower', 'Brinjal', 'Okra', 'Peas', 'Beans', 'Carrot', 'Radish',
+    'Beetroot', 'Cucumber', 'Bitter Gourd', 'Bottle Gourd', 'Pumpkin'
+].sort()
 
-const STATES = ['Maharashtra', 'Punjab', 'Uttar Pradesh', 'Madhya Pradesh', 'Rajasthan',
-    'Haryana', 'Gujarat', 'Karnataka', 'Andhra Pradesh', 'Telangana', 'Tamil Nadu']
+const STATES = [
+    'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh', 'Goa',
+    'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jharkhand', 'Karnataka', 'Kerala',
+    'Madhya Pradesh', 'Maharashtra', 'Manipur', 'Meghalaya', 'Mizoram', 'Nagaland',
+    'Odisha', 'Punjab', 'Rajasthan', 'Sikkim', 'Tamil Nadu', 'Telangana', 'Tripura',
+    'Uttar Pradesh', 'Uttarakhand', 'West Bengal', 'Delhi', 'Chandigarh',
+    'Jammu and Kashmir', 'Ladakh'
+].sort()
 
 export default function MarketAnalyzer({ isOpen, onToggle, language, autoSpeak, userProfile }: MarketAnalyzerProps) {
     const [commodity, setCommodity] = useState('Wheat')
@@ -39,6 +53,8 @@ export default function MarketAnalyzer({ isOpen, onToggle, language, autoSpeak, 
         prices?: { data: PriceRow[]; msp?: number; source: string }
         news?: NewsItem[]
         yield_weather_advice?: string
+        season?: string
+        analysis_date?: string
         ai_summary?: string
         audio_base64?: string
         audio_format?: string
@@ -109,6 +125,20 @@ export default function MarketAnalyzer({ isOpen, onToggle, language, autoSpeak, 
 
                     {result && (
                         <div className="space-y-4">
+                            {/* Context Info */}
+                            {(result.season || result.analysis_date) && (
+                                <div className="bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-xl p-3">
+                                    <div className="flex items-center justify-between text-xs">
+                                        {result.season && (
+                                            <span className="font-medium text-green-700">🌾 {result.season}</span>
+                                        )}
+                                        {result.analysis_date && (
+                                            <span className="text-gray-600">📅 {new Date(result.analysis_date).toLocaleDateString()}</span>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
                             {/* Price Table */}
                             {result.prices?.data && result.prices.data.length > 0 && (
                                 <div>
@@ -147,23 +177,35 @@ export default function MarketAnalyzer({ isOpen, onToggle, language, autoSpeak, 
                                 </div>
                             )}
 
-                            {/* Yield Weather */}
+                            {/* Weather Advice */}
                             {result.yield_weather_advice && (
                                 <div className="bg-sky-50 border border-sky-200 rounded-xl p-3">
-                                    <h4 className="text-xs font-semibold text-sky-700 mb-1">🌦️ Best Yield Window</h4>
+                                    <h4 className="text-xs font-semibold text-sky-700 mb-1">🌦️ Weather Impact</h4>
                                     <p className="text-xs text-sky-800">{result.yield_weather_advice}</p>
                                 </div>
                             )}
 
                             {/* AI Summary */}
                             {result.ai_summary && (
-                                <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 max-h-64 overflow-y-auto">
-                                    <h4 className="flex items-center gap-2 mb-2 text-blue-700 font-medium text-xs uppercase tracking-wide">
+                                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4 max-h-96 overflow-y-auto shadow-sm">
+                                    <h4 className="flex items-center gap-2 mb-3 text-blue-700 font-semibold text-sm uppercase tracking-wide">
                                         <span>🤖 AI Market Insights</span>
                                     </h4>
-                                    <ReactMarkdown className="prose prose-xs max-w-none prose-blue text-gray-700">
-                                        {result.ai_summary}
-                                    </ReactMarkdown>
+                                    <div className="prose prose-sm max-w-none text-gray-800 space-y-3">
+                                        <ReactMarkdown
+                                            components={{
+                                                h3: ({ children }) => <h3 className="text-base font-bold text-blue-800 mt-4 mb-2 flex items-center gap-2">{children}</h3>,
+                                                h4: ({ children }) => <h4 className="text-sm font-semibold text-blue-700 mt-3 mb-1">{children}</h4>,
+                                                p: ({ children }) => <p className="text-sm leading-relaxed mb-2">{children}</p>,
+                                                ul: ({ children }) => <ul className="list-disc list-inside space-y-1 ml-2">{children}</ul>,
+                                                li: ({ children }) => <li className="text-sm">{children}</li>,
+                                                strong: ({ children }) => <strong className="font-semibold text-gray-900">{children}</strong>,
+                                                em: ({ children }) => <em className="italic text-blue-700">{children}</em>,
+                                            }}
+                                        >
+                                            {result.ai_summary}
+                                        </ReactMarkdown>
+                                    </div>
                                 </div>
                             )}
 

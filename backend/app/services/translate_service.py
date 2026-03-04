@@ -12,12 +12,25 @@ from app.models.schemas import TranslationResponse
 logger = structlog.get_logger()
 
 # App 2-letter code → Sarvam BCP-47 code
+# Sarvam AI officially supports 15 Indian languages + English
 SARVAM_LANG = {
-    "hi": "hi-IN", "bn": "bn-IN", "te": "te-IN", "mr": "mr-IN",
-    "ta": "ta-IN", "gu": "gu-IN", "kn": "kn-IN", "ml": "ml-IN",
-    "pa": "pa-IN", "or": "od-IN", "as": "as-IN", "ur": "ur-IN",
-    "en": "en-IN", "ne": "ne-IN", "sa": "sa-IN",
-    "si": "en-IN",  # Sinhala not yet supported → English fallback
+    # Major Indian Languages (fully supported by Sarvam AI)
+    "en": "en-IN",  # English
+    "hi": "hi-IN",  # Hindi (हिंदी)
+    "bn": "bn-IN",  # Bengali (বাংলা)
+    "te": "te-IN",  # Telugu (తెలుగు)
+    "mr": "mr-IN",  # Marathi (मराठी)
+    "ta": "ta-IN",  # Tamil (தமிழ்)
+    "gu": "gu-IN",  # Gujarati (ગુજરાતી)
+    "kn": "kn-IN",  # Kannada (ಕನ್ನಡ)
+    "ml": "ml-IN",  # Malayalam (മലയാളം)
+    "pa": "pa-IN",  # Punjabi (ਪੰਜਾਬੀ)
+    "or": "od-IN",  # Odia (ଓଡ଼ିଆ)
+    "as": "as-IN",  # Assamese (অসমীয়া)
+    "ur": "ur-IN",  # Urdu (اردو)
+    # Additional Supported Languages
+    "ne": "ne-IN",  # Nepali (नेपाली)
+    "sa": "sa-IN",  # Sanskrit (संस्कृत)
 }
 
 
@@ -58,18 +71,43 @@ async def translate_text(
             domain=domain,
         )
 
+    # Check cache first (reduces Sarvam API costs)
+    from app.core.cache import get_cached_translation, cache_translation
+    
+    cached = await get_cached_translation(text, source_language, target_language)
+    if cached:
+        logger.info("translation_cache_hit", src=source_language, tgt=target_language, text_preview=text[:30])
+        import json
+        try:
+            cached_data = json.loads(cached)
+            return TranslationResponse(**cached_data)
+        except:
+            # Fallback if cache format is old
+            return TranslationResponse(
+                translated_text=cached,
+                source_language=source_language,
+                target_language=target_language,
+                confidence=0.95,
+                domain=domain,
+            )
+
     src = SARVAM_LANG.get(source_language, "en-IN")
     tgt = SARVAM_LANG.get(target_language, "en-IN")
 
     try:
         translated = await asyncio.to_thread(_sync_translate, text, src, tgt)
-        return TranslationResponse(
+        result = TranslationResponse(
             translated_text=translated,
             source_language=source_language,
             target_language=target_language,
             confidence=0.95,
             domain=domain,
         )
+        
+        # Cache the translation (common phrases get 7-day TTL)
+        await cache_translation(text, source_language, target_language, result.model_dump_json())
+        
+        return result
     except Exception as exc:
         logger.warning("sarvam_translate_fallback", error=str(exc))
         return _demo_translation(text, source_language, target_language, domain)

@@ -25,13 +25,21 @@ class Settings(BaseSettings):
     BEDROCK_CLAUDE_MODEL_ID: str = "anthropic.claude-3-haiku-20240307-v1:0"
     BEDROCK_GUARDRAIL_ID: str = ""
     BEDROCK_GUARDRAIL_VERSION: str = "DRAFT"
+    
+    # Bedrock Knowledge Bases
+    BEDROCK_INSURANCE_KB_ID: str = ""  # Insurance schemes KB
+    BEDROCK_AGRI_KB_ID: str = ""       # Agriculture knowledge KB (farming, crops, pests)
 
     # Database (Supabase PostgreSQL)
     DATABASE_URL: str = "postgresql://postgres:7MGCdVgJjwRruuXT@db.omsukgvwlzmyprszgkuj.supabase.co:5432/postgres"
     DATABASE_POOL_URL: str = "postgresql://postgres.omsukgvwlzmyprszgkuj:7MGCdVgJjwRruuXT@aws-1-ap-northeast-1.pooler.supabase.com:6543/postgres"
 
-    # Redis
+    # Redis / ElastiCache (AWS Managed Redis for production)
+    # Development: redis://localhost:6379/0
+    # Production: redis://master.your-cluster.xxxxx.ap-south-1.cache.amazonaws.com:6379
+    # TLS: rediss://master.your-cluster.xxxxx.ap-south-1.cache.amazonaws.com:6379
     REDIS_URL: str = "redis://localhost:6379/0"
+    REDIS_CACHE_ENABLED: bool = True  # Set to False to disable caching
 
     # S3
     S3_BUCKET_NAME: str = "agri-translate-images"
@@ -41,7 +49,6 @@ class Settings(BaseSettings):
     WEATHER_API_BASE: str = "https://api.open-meteo.com/v1"
 
     # eNAM Market
-    ENAM_API_KEY: str = ""
     ENAM_API_BASE: str = "https://api.enam.gov.in/web/api/trade-data"
 
     # Security

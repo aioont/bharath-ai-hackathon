@@ -30,3 +30,5 @@ mangum>=0.17
 PyYAML>=6.0
 mem0ai>=0.1.31
 deepeval>=1.4.0
+duckduckgo-search>=4.1.0
+PyPDF2>=3.0.0          # PDF text extraction

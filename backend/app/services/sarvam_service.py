@@ -45,21 +45,33 @@ def _build_system_prompt(category: Optional[str] = None) -> str:
 
 # ---------------------------------------------------------------------------
 # Language code mapping  (2-letter app code → Sarvam BCP-47 code)
+# Sarvam AI officially supports 15 Indian languages + English
 # ---------------------------------------------------------------------------
 SARVAM_LANG = {
-    "hi": "hi-IN", "bn": "bn-IN", "te": "te-IN", "mr": "mr-IN",
-    "ta": "ta-IN", "gu": "gu-IN", "kn": "kn-IN", "ml": "ml-IN",
-    "pa": "pa-IN", "or": "od-IN", "as": "as-IN", "ur": "ur-IN",
-    "en": "en-IN", "ne": "ne-IN", "sa": "sa-IN",
-    # fallbacks
-    "si": "en-IN",
+    # Major Indian Languages (fully supported by Sarvam AI)
+    "en": "en-IN",  # English
+    "hi": "hi-IN",  # Hindi (हिंदी)
+    "bn": "bn-IN",  # Bengali (বাংলা)
+    "te": "te-IN",  # Telugu (తెలుగు)
+    "mr": "mr-IN",  # Marathi (मराठी)
+    "ta": "ta-IN",  # Tamil (தமிழ்)
+    "gu": "gu-IN",  # Gujarati (ગુજરાતી)
+    "kn": "kn-IN",  # Kannada (ಕನ್ನಡ)
+    "ml": "ml-IN",  # Malayalam (മലയാളം)
+    "pa": "pa-IN",  # Punjabi (ਪੰਜਾਬੀ)
+    "or": "od-IN",  # Odia (ଓଡ଼ିଆ)
+    "as": "as-IN",  # Assamese (অসমীয়া)
+    "ur": "ur-IN",  # Urdu (اردو)
+    # Additional Supported Languages
+    "ne": "ne-IN",  # Nepali (नेपाली)
+    "sa": "sa-IN",  # Sanskrit (संस्कृत)
 }
 
 LANG_NAMES = {
-    "hi": "Hindi", "bn": "Bengali", "te": "Telugu", "mr": "Marathi",
-    "ta": "Tamil", "gu": "Gujarati", "kn": "Kannada", "ml": "Malayalam",
-    "pa": "Punjabi", "or": "Odia", "as": "Assamese", "ur": "Urdu",
-    "en": "English", "ne": "Nepali", "sa": "Sanskrit", "si": "Sinhala",
+    "en": "English", "hi": "Hindi", "bn": "Bengali", "te": "Telugu",
+    "mr": "Marathi", "ta": "Tamil", "gu": "Gujarati", "kn": "Kannada",
+    "ml": "Malayalam", "pa": "Punjabi", "or": "Odia", "as": "Assamese",
+    "ur": "Urdu", "ne": "Nepali", "sa": "Sanskrit",
 }
 
 # System prompts are now loaded from backend/app/prompts.yaml via _load_prompts() / _build_system_prompt()
@@ -108,10 +120,56 @@ def _tool_market_prices(commodity: str, location: str) -> str:
     """Get market prices by searching online."""
     return _tool_search_web(f"current market price (mandi bhav) of {commodity} in {location} today")
 
+async def _tool_agriculture_knowledge(query: str) -> str:
+    """Query agriculture knowledge base for farming information, crop cultivation, pest management, etc."""
+    from app.core.config import settings
+    from app.core.aws_client import get_bedrock_client
+    from app.core.cache import get_cached_bedrock_kb_query, cache_bedrock_kb_query
+    
+    # Check if agriculture KB is configured
+    if not settings.BEDROCK_AGRI_KB_ID:
+        logger.warning("agri_kb_not_configured", query=query)
+        # Fallback to web search
+        return _tool_search_web(f"agriculture farming {query}")
+    
+    # Check cache first (MAJOR COST SAVINGS - OpenSearch is expensive!)
+    cached_result = await get_cached_bedrock_kb_query(query, settings.BEDROCK_AGRI_KB_ID)
+    if cached_result:
+        logger.info("agri_kb_cache_hit", query=query[:50])
+        return cached_result
+    
+    try:
+        bedrock = get_bedrock_client()
+        response = await asyncio.to_thread(
+            bedrock.retrieve_and_generate,
+            query=query,
+            kb_id=settings.BEDROCK_AGRI_KB_ID,
+            max_results=5
+        )
+        
+        # Extract generated text from response
+        output_text = response.get("output", {}).get("text", "")
+        
+        if not output_text:
+            logger.warning("agri_kb_empty_response", query=query)
+            return f"No relevant farming information found for: {query}"
+        
+        # Cache the result (semantic + exact match)
+        await cache_bedrock_kb_query(query, settings.BEDROCK_AGRI_KB_ID, output_text)
+        
+        logger.info("agri_kb_success", query=query, response_length=len(output_text), cached=True)
+        return output_text
+        
+    except Exception as e:
+        logger.error("agri_kb_error", error=str(e), query=query)
+        # Fallback to web search on error
+        return _tool_search_web(f"agriculture farming {query}")
+
 AVAILABLE_TOOLS = {
     "SEARCH": _tool_search_web,
     "WEATHER": _tool_get_weather,
     "MARKET": _tool_market_prices,
+    "KNOWLEDGE": _tool_agriculture_knowledge,  # NEW: RAG-based agriculture knowledge
 }
 
 
@@ -132,13 +190,17 @@ async def _agent_loop(messages: list, system_prompt: str, tools_enabled: bool = 
     # Augmented system prompt for tool use
     tool_instructions = (
         "\n\nYou have access to these tools to answer questions accurately:\n"
-        "- SEARCH: General knowledge, news, government schemes.\n"
+        "- SEARCH: General knowledge, news, government schemes (web search).\n"
         "- WEATHER: Current weather and forecasts.\n"
-        "- MARKET: Mandi prices and market trends.\n\n"
+        "- MARKET: Mandi prices and market trends.\n"
+        "- KNOWLEDGE: Agriculture knowledge base - use for farming practices, crop cultivation, "
+        "pest management, soil health, fertilizer recommendations, etc.\n\n"
         "To use a tool, your response must be valid JSON strictly in this format:\n"
         '{"tool": "SEARCH", "query": "your search query"}\n'
         '{"tool": "WEATHER", "location": "city name"}\n'
-        '{"tool": "MARKET", "commodity": "crop name", "location": "city/state"}\n\n'
+        '{"tool": "MARKET", "commodity": "crop name", "location": "city/state"}\n'
+        '{"tool": "KNOWLEDGE", "query": "farming question"}\n\n'
+        "IMPORTANT: Use KNOWLEDGE tool for farming/agriculture questions. Use SEARCH for other topics.\n"
         "If no tool is needed, just respond with your expert advice in the user's language."
     )
     
@@ -171,6 +233,8 @@ async def _agent_loop(messages: list, system_prompt: str, tools_enabled: bool = 
                             tool_result = await asyncio.to_thread(_tool_get_weather, tool_call.get("location", ""))
                         elif tool_name == "MARKET":
                             tool_result = await asyncio.to_thread(_tool_market_prices, tool_call.get("commodity", ""), tool_call.get("location", ""))
+                        elif tool_name == "KNOWLEDGE":
+                            tool_result = await _tool_agriculture_knowledge(tool_call.get("query", ""))
                         else:
                             tool_result = "Unknown tool."
 

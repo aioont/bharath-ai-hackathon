@@ -217,10 +217,23 @@ export default function PlanGenerator({ isOpen, onToggle, language, autoSpeak, u
                             )}
 
                             {/* Plan text */}
-                            <div className="bg-gray-50 rounded-xl p-3 text-xs text-gray-700 max-h-64 overflow-y-auto leading-relaxed">
-                                <ReactMarkdown className="prose prose-xs max-w-none prose-green">
-                                    {result.plan}
-                                </ReactMarkdown>
+                            <div className="bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200 rounded-xl p-4 max-h-96 overflow-y-auto shadow-sm">
+                                <div className="prose prose-sm max-w-none text-gray-800 space-y-3">
+                                    <ReactMarkdown
+                                        components={{
+                                            h3: ({ children }) => <h3 className="text-base font-bold text-green-800 mt-4 mb-2 flex items-center gap-2">{children}</h3>,
+                                            h4: ({ children }) => <h4 className="text-sm font-semibold text-green-700 mt-3 mb-1">{children}</h4>,
+                                            p: ({ children }) => <p className="text-sm leading-relaxed mb-2">{children}</p>,
+                                            ul: ({ children }) => <ul className="list-disc list-inside space-y-1 ml-2">{children}</ul>,
+                                            ol: ({ children }) => <ol className="list-decimal list-inside space-y-1 ml-2">{children}</ol>,
+                                            li: ({ children }) => <li className="text-sm">{children}</li>,
+                                            strong: ({ children }) => <strong className="font-semibold text-gray-900">{children}</strong>,
+                                            em: ({ children }) => <em className="italic text-green-700">{children}</em>,
+                                        }}
+                                    >
+                                        {result.plan}
+                                    </ReactMarkdown>
+                                </div>
                             </div>
 
                             {/* Audio */}

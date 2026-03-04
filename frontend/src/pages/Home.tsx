@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Languages, MessageSquareText, Leaf, TrendingUp, CloudSun, Users, ArrowRight, Sprout, Shield, Zap, ExternalLink, Newspaper, Mic } from 'lucide-react'
+import { Languages, Mic, Leaf, TrendingUp, CloudSun, Users, ArrowRight, Sprout, Shield, Zap, ExternalLink, Newspaper } from 'lucide-react'
 import { useAppContext, GREETINGS } from '@/context/AppContext'
 import { FARMING_SEASONS, CROP_CATEGORIES } from '@/utils/constants'
 import { getNewsFeed, type NewsItem } from '@/services/api'
@@ -8,7 +8,7 @@ import { getNewsFeed, type NewsItem } from '@/services/api'
 const features = [
   {
     to: '/chat',
-    icon: MessageSquareText,
+    icon: Mic,
     emoji: '🌾',
     title: 'AgriSaarthi',
     description: 'Autonomous AI agent with voice & text support in 15+ languages — your personal farming assistant',

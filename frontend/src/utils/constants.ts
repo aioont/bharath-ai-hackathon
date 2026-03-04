@@ -1,3 +1,5 @@
+// Sarvam AI officially supports 15 Indian languages + English
+// Language order: English first, then by speaker population in India
 export const SUPPORTED_LANGUAGES = [
   { code: 'en', name: 'English', englishName: 'English', flag: '🇬🇧', script: 'Latin' },
   { code: 'hi', name: 'हिंदी', englishName: 'Hindi', flag: '🇮🇳', script: 'Devanagari' },
@@ -6,15 +8,14 @@ export const SUPPORTED_LANGUAGES = [
   { code: 'mr', name: 'मराठी', englishName: 'Marathi', flag: '🇮🇳', script: 'Devanagari' },
   { code: 'ta', name: 'தமிழ்', englishName: 'Tamil', flag: '🇮🇳', script: 'Tamil' },
   { code: 'gu', name: 'ગુજરાતી', englishName: 'Gujarati', flag: '🇮🇳', script: 'Gujarati' },
+  { code: 'ur', name: 'اردو', englishName: 'Urdu', flag: '🇮🇳', script: 'Nastaliq' },
   { code: 'kn', name: 'ಕನ್ನಡ', englishName: 'Kannada', flag: '🇮🇳', script: 'Kannada' },
   { code: 'ml', name: 'മലയാളം', englishName: 'Malayalam', flag: '🇮🇳', script: 'Malayalam' },
-  { code: 'pa', name: 'ਪੰਜਾਬੀ', englishName: 'Punjabi', flag: '🇮🇳', script: 'Gurmukhi' },
   { code: 'or', name: 'ଓଡ଼ିଆ', englishName: 'Odia', flag: '🇮🇳', script: 'Odia' },
+  { code: 'pa', name: 'ਪੰਜਾਬੀ', englishName: 'Punjabi', flag: '🇮🇳', script: 'Gurmukhi' },
   { code: 'as', name: 'অসমীয়া', englishName: 'Assamese', flag: '🇮🇳', script: 'Bengali' },
-  { code: 'ur', name: 'اردو', englishName: 'Urdu', flag: '🇮🇳', script: 'Nastaliq' },
-  { code: 'sa', name: 'संस्कृत', englishName: 'Sanskrit', flag: '🇮🇳', script: 'Devanagari' },
   { code: 'ne', name: 'नेपाली', englishName: 'Nepali', flag: '🇳🇵', script: 'Devanagari' },
-  { code: 'si', name: 'සිංහල', englishName: 'Sinhala', flag: '🇱🇰', script: 'Sinhala' },
+  { code: 'sa', name: 'संस्कृत', englishName: 'Sanskrit', flag: '🇮🇳', script: 'Devanagari' },
 ]
 
 export const CROP_CATEGORIES = [

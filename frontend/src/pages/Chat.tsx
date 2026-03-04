@@ -92,8 +92,8 @@ export default function Chat() {
   //            when OFF → text only, no TTS
   const [autoSpeak, setAutoSpeak] = useState(false)
   // Feature cards accordion: only one open at a time
-  const [openCard, setOpenCard] = useState<'plan' | 'market' | 'schemes' | null>(null)
-  const toggleCard = (card: 'plan' | 'market' | 'schemes') =>
+  const [openCard, setOpenCard] = useState<'plan' | 'market' | null>(null)
+  const toggleCard = (card: 'plan' | 'market') =>
     setOpenCard(prev => prev === card ? null : card)
 
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -299,7 +299,7 @@ export default function Chat() {
 
       {/* Feature Card Panels */}
       {openCard === 'plan' && (
-        <div className="flex-shrink-0 mb-3 overflow-y-auto max-h-[50vh]">
+        <div className="flex-shrink-0 mb-3 overflow-y-auto max-h-[75vh]">
           <PlanGenerator
             isOpen
             onToggle={() => toggleCard('plan')}
@@ -310,7 +310,7 @@ export default function Chat() {
         </div>
       )}
       {openCard === 'market' && (
-        <div className="flex-shrink-0 mb-3 overflow-y-auto max-h-[50vh]">
+        <div className="flex-shrink-0 mb-3 overflow-y-auto max-h-[75vh]">
           <MarketAnalyzer
             isOpen
             onToggle={() => toggleCard('market')}
@@ -321,38 +321,42 @@ export default function Chat() {
         </div>
       )}
 
-      {/* Messages */}
-      <div
-        ref={chatRef}
-        onScroll={handleScroll}
-        className="flex-1 overflow-y-auto scrollbar-hide rounded-2xl bg-gray-50 border border-gray-200 p-4 relative"
-      >
-        {messages.map((msg, i) => (
-          <div key={i}>
-            <ChatMessageBubble message={msg} isLatest={i === messages.length - 1} />
+      {/* Messages - Hidden when AI Decision Modules are active */}
+      {!openCard && (
+        <>
+          <div
+            ref={chatRef}
+            onScroll={handleScroll}
+            className="flex-1 overflow-y-auto scrollbar-hide rounded-2xl bg-gray-50 border border-gray-200 p-4 relative"
+          >
+            {messages.map((msg, i) => (
+              <div key={i}>
+                <ChatMessageBubble message={msg} isLatest={i === messages.length - 1} />
+              </div>
+            ))}
+
+            {loading && (
+              <div className="p-4 bg-white rounded-2xl rounded-tl-none shadow-sm inline-block border border-gray-100">
+                <TypingIndicator />
+                <span className="text-xs text-green-600 block mt-1 animate-pulse">
+                  {autoSpeak ? 'Thinking & preparing voice…' : 'Researching…'}
+                </span>
+              </div>
+            )}
+
+            <div ref={bottomRef} />
           </div>
-        ))}
 
-        {loading && (
-          <div className="p-4 bg-white rounded-2xl rounded-tl-none shadow-sm inline-block border border-gray-100">
-            <TypingIndicator />
-            <span className="text-xs text-green-600 block mt-1 animate-pulse">
-              {autoSpeak ? 'Thinking & preparing voice…' : 'Researching…'}
-            </span>
-          </div>
-        )}
-
-        <div ref={bottomRef} />
-      </div>
-
-      {/* Scroll-to-bottom button */}
-      {showScroll && (
-        <button
-          onClick={() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' })}
-          className="absolute bottom-24 right-6 bg-white border border-gray-200 rounded-full p-2 shadow-md hover:bg-gray-50 transition-colors"
-        >
-          ↓
-        </button>
+          {/* Scroll-to-bottom button */}
+          {showScroll && (
+            <button
+              onClick={() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' })}
+              className="absolute bottom-24 right-6 bg-white border border-gray-200 rounded-full p-2 shadow-md hover:bg-gray-50 transition-colors"
+            >
+              ↓
+            </button>
+          )}
+        </>
       )}
 
       {/* Input */}

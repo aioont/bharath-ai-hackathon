@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 
 from app.core.config import settings
 from app.api.routes import translate, chat, crop_health, weather, market, forum, news, auth, crops
-from app.api.routes import plan, market_analyzer, scheme_advisor, mock_iot, evaluation, insurance
+from app.api.routes import plan, market_analyzer, mock_iot, evaluation, insurance, admin
 
 # ---------------------------------------------------------------------------
 # Logging — configure stdlib logging so every logger in every route works
@@ -99,10 +99,10 @@ app.include_router(auth.router)
 app.include_router(crops.router)
 app.include_router(plan.router)
 app.include_router(market_analyzer.router)
-app.include_router(scheme_advisor.router)
 app.include_router(mock_iot.router)
 app.include_router(evaluation.router)
 app.include_router(insurance.router)
+app.include_router(admin.router)  # Cache statistics & management
 
 
 # ---------------------------------------------------------------------------

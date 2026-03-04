@@ -3,7 +3,7 @@ Insurance Suggestion Service
 Flow:
   1. Fetch live schemes from myscheme.gov.in API (with local JSON cache fallback)
   2. Build RAG context:
-     a. If BEDROCK_KB_ID is set → query AWS Bedrock Knowledge Base (retrieve_and_generate)
+     a. If BEDROCK_INSURANCE_KB_ID is set → query AWS Bedrock Knowledge Base (retrieve_and_generate)
      b. Else → local keyword search over cached JSON (demo fallback)
   3. Sarvam-M reasons over retrieved schemes + user profile → personalised recommendations
 """
@@ -39,6 +39,17 @@ _local_cache     = Path(__file__).parent.parent.parent / "insurance_schemes.json
 # ---------------------------------------------------------------------------
 
 async def fetch_live_schemes(keyword: str = "insurance", size: int = 10) -> list[dict]:
+    # Check cache first (schemes don't change often - 6 hour TTL)
+    from app.core.cache import cache_get, cache_set, generate_cache_key, TTL_CONFIG
+    
+    cache_key = generate_cache_key("insurance_schemes", keyword=keyword, size=size)
+    cached = await cache_get(cache_key)
+    
+    if cached:
+        logger.info("insurance_schemes_cache_hit", keyword=keyword)
+        import json
+        return json.loads(cached)
+    
     # Build URL manually — httpx would double-encode `[]` to `%255B%255D`
     kw_encoded = httpx.URL("", params={"k": keyword}).params["k"]
     url = f"{MYSCHEME_BASE}?lang=en&q=%5B%5D&keyword={kw_encoded}&sort=&from=0&size={size}"
@@ -59,7 +70,13 @@ async def fetch_live_schemes(keyword: str = "insurance", size: int = 10) -> list
             if not isinstance(raw_list, list):
                 raw_list = []
             
-            return [_normalise(h) for h in raw_list if isinstance(h, dict)]
+            result = [_normalise(h) for h in raw_list if isinstance(h, dict)]
+            
+            # Cache the result
+            import json
+            await cache_set(cache_key, json.dumps(result), ttl=TTL_CONFIG["insurance_schemes"])
+            
+            return result
 
     except Exception as exc:
         logger.warning("myscheme_fetch_failed", error=str(exc))
@@ -91,6 +108,15 @@ async def _bedrock_rag(query: str, kb_id: str, max_results: int = 5) -> tuple[st
     """Query Bedrock KB and return generated answer + source citations."""
     try:
         from app.core.aws_client import get_bedrock_client
+        from app.core.cache import get_cached_bedrock_kb_query, cache_bedrock_kb_query
+        
+        # Check cache first (MAJOR COST SAVINGS - OpenSearch is expensive!)
+        cached_result = await get_cached_bedrock_kb_query(query, kb_id)
+        if cached_result:
+            logger.info("insurance_kb_cache_hit", query=query[:50])
+            # Cached result is just the text, return with empty citations
+            return cached_result, []
+        
         client = get_bedrock_client()
 
         # Run blocking call in thread
@@ -103,6 +129,11 @@ async def _bedrock_rag(query: str, kb_id: str, max_results: int = 5) -> tuple[st
 
         output_text = response.get("output", {}).get("text", "")
         citations = response.get("citations", [])
+        
+        # Cache the result (semantic + exact match) - COST SAVINGS
+        if output_text:
+            await cache_bedrock_kb_query(query, kb_id, output_text)
+            logger.info("insurance_kb_cached", query=query[:50])
         
         # Log retrieved KB data clearly
         logger.info(
@@ -257,7 +288,7 @@ async def suggest_insurance(
 ) -> dict:
     lang_name = LANG_NAMES.get(language, "English")
     query = _build_query(user_details)
-    kb_id = getattr(settings, "BEDROCK_KB_ID", "") if hasattr(settings, "BEDROCK_KB_ID") else ""
+    kb_id = getattr(settings, "BEDROCK_INSURANCE_KB_ID", "") if hasattr(settings, "BEDROCK_INSURANCE_KB_ID") else ""
 
     # Step 1: Retrieve relevant schemes
     bedrock_context, sources = "", []
