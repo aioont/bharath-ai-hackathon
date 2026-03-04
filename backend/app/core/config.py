@@ -30,9 +30,13 @@ class Settings(BaseSettings):
     BEDROCK_INSURANCE_KB_ID: str = ""  # Insurance schemes KB
     BEDROCK_AGRI_KB_ID: str = ""       # Agriculture knowledge KB (farming, crops, pests)
 
-    # Database (Supabase PostgreSQL)
+    # Database (PostgreSQL - Supabase or AWS RDS)
+    # Supabase example: postgresql://postgres:PASSWORD@db.xxx.supabase.co:5432/postgres
+    # AWS RDS example: postgresql://postgres:PASSWORD@agrisaarthi-db.abc123.ap-south-1.rds.amazonaws.com:5432/agrisaarthi?sslmode=require
     DATABASE_URL: str = "postgresql://postgres:7MGCdVgJjwRruuXT@db.omsukgvwlzmyprszgkuj.supabase.co:5432/postgres"
     DATABASE_POOL_URL: str = "postgresql://postgres.omsukgvwlzmyprszgkuj:7MGCdVgJjwRruuXT@aws-1-ap-northeast-1.pooler.supabase.com:6543/postgres"
+    # For AWS RDS without pooler, use the same URL for both (RDS handles connection pooling internally)
+    # Or use RDS Proxy for advanced pooling: postgresql://postgres:PASSWORD@agrisaarthi-proxy.proxy-abc.ap-south-1.rds.amazonaws.com:5432/agrisaarthi?sslmode=require
 
     # Redis / ElastiCache (AWS Managed Redis for production)
     # Development: redis://localhost:6379/0

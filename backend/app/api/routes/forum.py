@@ -13,11 +13,19 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/forum", tags=["Community Forum"])
 
 # ---------------------------------------------------------------------------
-# Database helpers — psycopg2 with Supabase
+# Database helpers — psycopg2 with PostgreSQL (Supabase or AWS RDS)
 # ---------------------------------------------------------------------------
 
 def _get_conn():
-    """Open a connection to Supabase using the pool URL."""
+    """Open a connection to PostgreSQL using the pool URL.
+    
+    Compatible with:
+    - Supabase PostgreSQL (current)
+    - AWS RDS PostgreSQL (migration-ready, see docs/AWS_RDS_MIGRATION.md)
+    - Any PostgreSQL 12+ database
+    
+    Uses DATABASE_POOL_URL from settings for connection pooling.
+    """
     import psycopg2
     import psycopg2.extras
     psycopg2.extras.register_uuid()
