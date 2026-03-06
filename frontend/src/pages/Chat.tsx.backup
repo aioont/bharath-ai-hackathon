@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Send, Sparkles, Volume2, VolumeX, Trash2 } from 'lucide-react'
-import { sendChatMessage, getCrops, getChatHistory, clearChatHistory } from '@/services/api'
+import { Send, Sparkles, Volume2, VolumeX } from 'lucide-react'
+import { sendChatMessage, getCrops, saveChatMessage, getConversation } from '@/services/api'
 import type { ChatMessage, FarmerCrop } from '@/services/api'
 import ChatMessageBubble, { TypingIndicator } from '@/components/ChatMessage'
 import VoiceButton from '@/components/VoiceButton'
@@ -37,6 +37,18 @@ interface ChatMessageExt extends ChatMessage {
 }
 
 // ---------------------------------------------------------------------------
+// Generate or retrieve conversation ID
+// ---------------------------------------------------------------------------
+function getOrCreateConversationId(): string {
+  const stored = localStorage.getItem('current_conversation_id')
+  if (stored) return stored
+  
+  const newId = crypto.randomUUID()
+  localStorage.setItem('current_conversation_id', newId)
+  return newId
+}
+
+// ---------------------------------------------------------------------------
 // Error helper
 // ---------------------------------------------------------------------------
 function extractErrorMessage(err: unknown): string {
@@ -56,66 +68,17 @@ function extractErrorMessage(err: unknown): string {
 // Component
 // ---------------------------------------------------------------------------
 export default function Chat() {
-  const { state, t } = useAppContext()
+  const { state } = useAppContext()
   const profile = state.userProfile
+
+  // Conversation ID for persistent storage
+  const [conversationId] = useState(getOrCreateConversationId())
 
   // Load farmer's crops for LLM context
   const [crops, setCrops] = useState<FarmerCrop[]>([])
-  const [loadingHistory, setLoadingHistory] = useState(false)
-  
-  // Load chat history on mount
-  const loadChatHistory = async () => {
-    if (!state.authUser) return
-    
-    try {
-      setLoadingHistory(true)
-      const { messages: historyMsgs } = await getChatHistory(false)
-      
-      if (historyMsgs && historyMsgs.length > 0) {
-        const convertedMessages: ChatMessageExt[] = historyMsgs.map(msg => ({
-          role: msg.role as 'user' | 'assistant',
-          content: msg.content,
-          timestamp: msg.created_at,
-        }))
-        
-        setMessages(convertedMessages)
-        toast.success(`Loaded ${historyMsgs.length} messages from history`, { duration: 2000 })
-      }
-    } catch (error) {
-      console.error('Failed to load chat history:', error)
-      // Keep default welcome message if history load fails
-    } finally {
-      setLoadingHistory(false)
-    }
-  }
-  
-  const handleClearChat = async () => {
-    if (!confirm('Are you sure you want to clear all chat history? This cannot be undone.')) {
-      return
-    }
-    
-    try {
-      await clearChatHistory()
-      
-      // Reset to welcome message
-      setMessages([{
-        role: 'assistant',
-        content: profile?.name
-          ? `Namaste ${profile.name}! 🌾 ${TOPIC_WELCOME[selectedTopic]}`
-          : TOPIC_WELCOME[selectedTopic],
-        timestamp: new Date().toISOString(),
-      }])
-      
-      toast.success('Chat history cleared successfully')
-    } catch (error) {
-      toast.error('Failed to clear chat history')
-    }
-  }
-  
   useEffect(() => {
     if (state.authUser) {
       getCrops().then(setCrops).catch(() => { })
-      loadChatHistory()
     }
   }, [state.authUser])
 
@@ -131,6 +94,30 @@ export default function Chat() {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [chatLang, setChatLang] = useState(state.selectedLanguage.code)
+
+  // Load conversation history on mount (if authenticated)
+  useEffect(() => {
+    if (state.authUser && conversationId) {
+      getConversation(conversationId, 100, 0)
+        .then((data) => {
+          if (data.messages.length > 0) {
+            const loadedMessages: ChatMessageExt[] = data.messages.map((m) => ({
+              role: m.role as 'user' | 'assistant',
+              content: m.content,
+              timestamp: m.timestamp,
+              audioBase64: m.audio_base64,
+              audioFormat: m.audio_format || 'wav',
+            }))
+            setMessages(loadedMessages)
+            toast.success(`Loaded ${data.messages.length} messages from history`, { duration: 2000 })
+          }
+        })
+        .catch((err) => {
+          console.warn('Failed to load conversation history:', err)
+          // Don't show error to user - just use default welcome message
+        })
+    }
+  }, [state.authUser, conversationId])
 
   // Sync chat language with global language changes
   useEffect(() => {
@@ -207,32 +194,16 @@ export default function Chat() {
     // Only switch if it's a known 2-letter code and different from current
     const known = ['hi', 'bn', 'te', 'mr', 'ta', 'gu', 'kn', 'ml', 'pa', 'or', 'as', 'ur', 'en']
     if (known.includes(langCode) && langCode !== chatLang) {
-      setChatLang(langCode)
-      toast.success(`Language switched to ${langCode.toUpperCase()}`, { duration: 2000 })
+    // Save user message to database (async, non-blocking)
+    if (state.authUser) {
+      saveChatMessage({
+        conversation_id: conversationId,
+        role: 'user',
+        content: msg,
+        language: chatLang,
+        category: selectedTopic,
+      }).catch((err) => console.warn('Failed to save user message:', err))
     }
-  }, [chatLang])
-
-  const handleScroll = () => {
-    const el = chatRef.current
-    if (el) setShowScroll(el.scrollHeight - el.scrollTop - el.clientHeight > 100)
-  }
-
-  // ── Send message ──────────────────────────────────────────────────────────
-  const sendMessage = async (text?: string) => {
-    const msg = (text ?? input).trim()
-    if (!msg || loading) return
-
-    window.speechSynthesis.cancel()
-
-    const userMessage: ChatMessageExt = {
-      role: 'user',
-      content: msg,
-      timestamp: new Date().toISOString(),
-    }
-
-    setMessages((prev) => [...prev, userMessage])
-    setInput('')
-    setLoading(true)
 
     try {
       const result = await sendChatMessage({
@@ -243,6 +214,51 @@ export default function Chat() {
         tts_enabled: autoSpeak,           // request TTS audio only when speaker is ON
         farmer_profile: (profile || crops.length > 0) ? {
           state: profile?.state,
+          district: profile?.district,
+          farming_type: profile?.farmingType,
+          crops: crops.map(c => ({
+            crop_name: c.crop_name,
+            area_acres: c.area_acres,
+            soil_type: c.soil_type,
+            season: c.season,
+            irrigation: c.irrigation,
+            variety: c.variety,
+            notes: c.notes,
+            is_primary: c.is_primary,
+          })),
+        } : undefined,
+      })
+
+      if (!mountedRef.current) return
+
+      const aiMessage: ChatMessageExt = {
+        role: 'assistant',
+        content: result.response,
+        timestamp: new Date().toISOString(),
+        ...(result.model === 'demo' ? { isDemo: true } : {}),
+        // Store audio from Sarvam TTS (present only when tts_enabled was true)
+        audioBase64: result.audio_base64 ?? undefined,
+        audioFormat: result.audio_format ?? 'wav',
+      }
+      setMessages((prev) => [...prev, aiMessage])
+
+      // Save AI response to database (async, non-blocking)
+      if (state.authUser) {
+        saveChatMessage({
+          conversation_id: conversationId,
+          role: 'assistant',
+          content: result.response,
+          language: chatLang,
+          category: selectedTopic,
+          audio_base64: result.audio_base64,
+          audio_format: result.audio_format || 'wav',
+          metadata: {
+            model: result.model,
+            tokens_used: result.tokens_used,
+            confidence: result.confidence,
+          },
+        }).catch((err) => console.warn('Failed to save AI message:', err))
+      }
           district: profile?.district,
           farming_type: profile?.farmingType,
           crops: crops.map(c => ({
@@ -298,67 +314,42 @@ export default function Chat() {
   }
 
   return (
-    <div
-      className="flex flex-col animate-fade-in"
-      style={{
-        zoom: 0.9,
-        height: 'calc(100vh - 8rem)',
-      }}
-    >
+    <div className="flex flex-col h-[calc(100vh-10rem)] md:h-[calc(100vh-8rem)] animate-fade-in">
       {/* Header & Topic Selector */}
-      <div className="flex-shrink-0 space-y-1 mb-2 bg-white p-1 rounded-lg shadow-sm border border-gray-100">
+      <div className="flex-shrink-0 space-y-3 mb-3 bg-white p-2 rounded-xl shadow-sm border border-gray-100">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <h1 className="font-bold text-gray-800 flex items-center gap-1.5">
-              <span className="text-base" title="AgriSaarthi - Your Autonomous AI Agricultural Expert">🌾</span>
-              <span className="bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent font-extrabold text-sm">{t('chatTitle')}</span>
-              <span className="text-[8px] px-1.5 py-0.5 bg-green-100 text-green-700 rounded-full font-normal" title="Autonomous Multilingual Voice & Text AI Expert for Bharat">AI Agent</span>
-            </h1>
-            {/* Speaker toggle */}
+          <h1 className="font-bold text-gray-800 flex items-center gap-2">
+            <span className="text-2xl" title="AgriSaarthi - Your Autonomous AI Agricultural Expert">🌾</span>
+            <span className="bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent font-extrabold">AgriSaarthi</span>
+            <span className="text-[9px] px-1.5 py-0.5 bg-green-100 text-green-700 rounded-full font-normal" title="Autonomous Multilingual Voice & Text AI Expert for Bharat">AI Agent</span>
+            {/* Speaker toggle — click to instantly stop & toggle voice mode */}
             <button
               onClick={handleSpeakerToggle}
-              className={`p-1.5 rounded-full transition-all duration-200 flex items-center gap-1 ${
-                autoSpeak
-                  ? 'text-green-600 bg-green-50 ring-1 ring-green-300'
-                  : 'text-gray-400 hover:bg-gray-100'
-              }`}
+              className={`p-1 rounded-full transition-all duration-200 ${autoSpeak
+                ? 'text-green-600 bg-green-50 ring-2 ring-green-300'
+                : 'text-gray-400 hover:bg-gray-100'
+                }`}
               title={autoSpeak ? 'Voice ON — click to mute & disable TTS' : 'Voice OFF — click to enable TTS audio'}
             >
-              {autoSpeak ? <Volume2 size={14} /> : <VolumeX size={14} />}
-              <span className="text-[10px] font-medium">
-                {autoSpeak ? t('audioMode') : t('textMode')}
-              </span>
+              {autoSpeak ? <Volume2 size={16} /> : <VolumeX size={16} />}
             </button>
-          </div>
-          
-          <div className="flex items-center gap-1">
-            <LanguageSelector value={chatLang} onChange={(l: Language) => setChatLang(l.code)} />
-            
-            {/* Clear Chat button - only show for authenticated users */}
-            {state.authUser && messages.length > 1 && (
-              <button
-                onClick={handleClearChat}
-                className="p-1.5 rounded-full transition-all duration-200 flex items-center gap-1 text-red-500 hover:bg-red-50"
-                title="Clear chat history"
-              >
-                <Trash2 size={14} />
-                <span className="text-[10px] font-medium hidden sm:inline">Clear</span>
-              </button>
-            )}
-            
-            
-          </div>
+            <span className={`text-[10px] font-normal px-1.5 py-0.5 rounded-full ${autoSpeak ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+              }`}>
+              {autoSpeak ? 'Audio ON' : 'Text only'}
+            </span>
+          </h1>
+          <LanguageSelector value={chatLang} onChange={(l: Language) => setChatLang(l.code)} />
         </div>
         <TopicSelector selectedTopic={selectedTopic} onSelect={setSelectedTopic} disabled={loading} />
 
         {/* Feature Cards toggle bar */}
         <div className="border-t border-gray-100 pt-2">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[10px] text-gray-400">⚡ {t('aiModules')}</span>
+            <span className="text-[10px] text-gray-400">⚡ AI Decision Modules:</span>
             {(
               [
-                ['plan', `🌱 ${t('cultivationAdvisor')}`, 'green'],
-                ['market', `📊 ${t('marketIntelligence')}`, 'blue']
+                ['plan', '🌱 Cultivation Advisor', 'green'],
+                ['market', '📊 Market Intelligence', 'blue']
               ] as const
               ).map(([key, label]) => (
               <button
@@ -373,57 +364,50 @@ export default function Chat() {
           </div>
         </div>
       </div>
-        
+
       {/* Feature Card Panels */}
       {openCard === 'plan' && (
-          <div className="flex-shrink-0 mb-2 overflow-y-auto max-h-[70vh]">
-            <PlanGenerator
-              isOpen
-              onToggle={() => toggleCard('plan')}
-              language={chatLang}
-              autoSpeak={autoSpeak}
-              userProfile={{ name: profile?.name, state: profile?.state }}
-            />
-          </div>
-        )}
-        {openCard === 'market' && (
-          <div className="flex-shrink-0 mb-2 overflow-y-auto max-h-[70vh]">
-            <MarketAnalyzer
-              isOpen
-              onToggle={() => toggleCard('market')}
-              language={chatLang}
-              autoSpeak={autoSpeak}
-              userProfile={{ state: profile?.state }}
-            />
-          </div>
-        )}
+        <div className="flex-shrink-0 mb-3 overflow-y-auto max-h-[75vh]">
+          <PlanGenerator
+            isOpen
+            onToggle={() => toggleCard('plan')}
+            language={chatLang}
+            autoSpeak={autoSpeak}
+            userProfile={{ name: profile?.name, state: profile?.state }}
+          />
+        </div>
+      )}
+      {openCard === 'market' && (
+        <div className="flex-shrink-0 mb-3 overflow-y-auto max-h-[75vh]">
+          <MarketAnalyzer
+            isOpen
+            onToggle={() => toggleCard('market')}
+            language={chatLang}
+            autoSpeak={autoSpeak}
+            userProfile={{ state: profile?.state }}
+          />
+        </div>
+      )}
 
-        {/* Messages - Hidden when AI Decision Modules are active */}
-        {!openCard && (
-          <>
-            <div
-              ref={chatRef}
-              onScroll={handleScroll}
-              className="flex-1 overflow-y-auto scrollbar-hide rounded-lg bg-gray-50 border border-gray-200 p-2 relative"
+      {/* Messages - Hidden when AI Decision Modules are active */}
+      {!openCard && (
+        <>
+          <div
+            ref={chatRef}
+            onScroll={handleScroll}
+            className="flex-1 overflow-y-auto scrollbar-hide rounded-2xl bg-gray-50 border border-gray-200 p-4 relative"
           >
-            {loadingHistory && (
-              <div className="flex items-center justify-center py-8">
-                <Sparkles className="animate-spin text-green-500 mr-2" size={20} />
-                <span className="text-sm text-gray-500">{t('loadingHistory')}</span>
-              </div>
-            )}
-            
-            {!loadingHistory && messages.map((msg, i) => (
+            {messages.map((msg, i) => (
               <div key={i}>
                 <ChatMessageBubble message={msg} isLatest={i === messages.length - 1} />
               </div>
             ))}
 
             {loading && (
-              <div className="p-3 bg-white rounded-xl rounded-tl-none shadow-sm inline-block border border-gray-100">
+              <div className="p-4 bg-white rounded-2xl rounded-tl-none shadow-sm inline-block border border-gray-100">
                 <TypingIndicator />
-                <span className="text-[10px] text-green-600 block mt-1 animate-pulse">
-                  {autoSpeak ? t('thinkingVoice') : t('researching')}
+                <span className="text-xs text-green-600 block mt-1 animate-pulse">
+                  {autoSpeak ? 'Thinking & preparing voice…' : 'Researching…'}
                 </span>
               </div>
             )}
@@ -435,16 +419,16 @@ export default function Chat() {
           {showScroll && (
             <button
               onClick={() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' })}
-              className="absolute bottom-20 right-4 bg-white border border-gray-200 rounded-full p-1.5 shadow-md hover:bg-gray-50 transition-colors text-xs"
+              className="absolute bottom-24 right-6 bg-white border border-gray-200 rounded-full p-2 shadow-md hover:bg-gray-50 transition-colors"
             >
               ↓
             </button>
           )}
         </>
-        )}
+      )}
 
-        {/* Input */}
-        <div className="flex-shrink-0 flex gap-1.5 mt-2 items-end">
+      {/* Input */}
+      <div className="flex-shrink-0 flex gap-2 mt-3 items-end">
         <VoiceButton
           onTranscript={handleVoiceTranscript}
           onDetectedLanguage={handleDetectedLanguage}
@@ -453,10 +437,10 @@ export default function Chat() {
           language={chatLang === 'hi' ? 'hi-IN' : chatLang === 'en' ? 'en-IN' : `${chatLang}-IN`}
           disabled={loading}
         />
-        <div className="flex-1 bg-white rounded-xl border-2 border-gray-200 focus-within:border-green-500 px-2.5 py-1.5 transition-all">
+        <div className="flex-1 bg-white rounded-2xl border-2 border-gray-200 focus-within:border-green-500 px-3 py-2 transition-all">
           <textarea
-            className="w-full resize-none focus:outline-none text-xs max-h-20 bg-transparent"
-            placeholder={isListening ? 'Listening…' : `${t('askAnyLang')} ${autoSpeak ? '🔊' : '📝'}`}
+            className="w-full resize-none focus:outline-none text-sm max-h-24 bg-transparent"
+            placeholder={isListening ? 'Listening…' : `Ask in any language… ${autoSpeak ? '🔊' : '📝'}`}
             rows={1}
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -471,9 +455,9 @@ export default function Chat() {
         <button
           onClick={() => sendMessage()}
           disabled={loading || !input.trim()}
-          className="bg-green-600 text-white p-2 rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors shadow-sm"
+          className="bg-green-600 text-white p-3 rounded-xl hover:bg-green-700 disabled:opacity-50 transition-colors shadow-sm"
         >
-          {loading ? <Sparkles size={16} className="animate-spin" /> : <Send size={16} />}
+          {loading ? <Sparkles size={20} className="animate-spin" /> : <Send size={20} />}
         </button>
       </div>
     </div>

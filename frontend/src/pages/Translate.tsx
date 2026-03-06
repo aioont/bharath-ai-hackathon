@@ -10,17 +10,10 @@ import LoadingSpinner from '@/components/LoadingSpinner'
 import { useAppContext } from '@/context/AppContext'
 import type { Language } from '@/context/AppContext'
 
-const QUICK_PHRASES = [
-  'What is the best fertilizer for wheat?',
-  'How to control pests in rice crops?',
-  'What is the current price of onion in the market?',
-  'When should I sow the seeds for kharif season?',
-  'How to improve soil quality for better yield?',
-  'What are the symptoms of rust disease in wheat?',
-]
+const QUICK_PHRASE_KEYS = ['qPhrase1', 'qPhrase2', 'qPhrase3', 'qPhrase4', 'qPhrase5', 'qPhrase6']
 
 export default function Translate() {
-  const { state } = useAppContext()
+  const { state, t } = useAppContext()
   const [inputText, setInputText] = useState('')
   const [outputText, setOutputText] = useState('')
   const [sourceLang, setSourceLang] = useState('en')
@@ -93,10 +86,10 @@ export default function Translate() {
     <div className="space-y-6 animate-fade-in">
       <div>
         <h1 className="section-title flex items-center gap-2">
-          <span>🌐</span> Voice & Text Translation
+          <span>🌐</span> {t('translateTitle')}
         </h1>
         <p className="section-subtitle">
-          Translate agricultural content into 22 Indian languages powered by Sarvam Translate
+          Translate agricultural content into 15 Indian languages powered by Sarvam Translate
         </p>
       </div>
 
@@ -173,7 +166,7 @@ export default function Translate() {
         ) : (
           <>
             <Sparkles size={18} />
-            Translate with Sarvam AI
+            {t('translateBtn')}
           </>
         )}
       </button>
@@ -213,17 +206,17 @@ export default function Translate() {
 
       {/* Quick Phrases */}
       <section>
-        <h3 className="font-semibold text-gray-700 text-sm mb-3">💡 Quick Phrases for Farmers</h3>
+        <h3 className="font-semibold text-gray-700 text-sm mb-3">💡 {t('quickPhrases')}</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          {QUICK_PHRASES.map((phrase) => (
+          {QUICK_PHRASE_KEYS.map((key) => (
             <button
-              key={phrase}
-              onClick={() => setInputText(phrase)}
+              key={key}
+              onClick={() => setInputText(t(key))}
               className="text-left px-3 py-2.5 rounded-xl bg-gray-50 hover:bg-primary-50 
                 border border-gray-200 hover:border-primary-300 text-sm text-gray-600 
                 hover:text-primary-700 transition-all"
             >
-              {phrase}
+              {t(key)}
             </button>
           ))}
         </div>

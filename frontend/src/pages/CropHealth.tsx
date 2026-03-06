@@ -9,7 +9,7 @@ import { DISEASE_SEVERITY, CROP_CATEGORIES } from '@/utils/constants'
 import { useAppContext } from '@/context/AppContext'
 
 export default function CropHealth() {
-  const { state } = useAppContext()
+  const { state, t } = useAppContext()
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -88,7 +88,7 @@ export default function CropHealth() {
     <div className="space-y-6 animate-fade-in">
       <div>
         <h1 className="section-title flex items-center gap-2">
-          <span>🌿</span> Crop Health Diagnostics
+          <span>🌿</span> {t('cropHealthTitle')}
         </h1>
         <p className="section-subtitle">
           Upload a photo of your crop to identify diseases and get AI-powered treatment recommendations
@@ -147,7 +147,7 @@ export default function CropHealth() {
               {isDragActive ? <Upload size={32} className="text-primary-600 animate-bounce" /> : <ImageIcon size={32} className="text-primary-500" />}
             </div>
             <h3 className="font-semibold text-gray-700 mb-2">
-              {isDragActive ? 'Drop your crop image here' : 'Upload Crop Photo'}
+              {isDragActive ? 'Drop your crop image here' : t('uploadPhoto')}
             </h3>
             <p className="text-sm text-gray-500 max-w-xs">
               Drag & drop or click to select. Take a clear photo of the affected leaf, stem, or fruit.
@@ -159,7 +159,7 @@ export default function CropHealth() {
 
       {/* Camera capture on mobile */}
       <label className="btn-secondary w-full flex items-center justify-center gap-2 cursor-pointer">
-        📷 Take Photo with Camera
+        📷 {t('takePhoto')}
         <input
           type="file"
           accept="image/*"
@@ -187,7 +187,7 @@ export default function CropHealth() {
         ) : (
           <>
             <Leaf size={18} />
-            Analyze Crop Health
+            {t('analyzeCropHealth')}
           </>
         )}
       </button>
@@ -283,7 +283,7 @@ export default function CropHealth() {
             }}
             className="btn-secondary w-full"
           >
-            📤 Share Health Report
+            📤 {t('shareHealthReport')}
           </button>
         </div>
       )}
@@ -291,7 +291,7 @@ export default function CropHealth() {
       {/* Tips */}
       {!result && (
         <div className="card bg-gradient-to-br from-primary-50 to-earth-50 border border-primary-100">
-          <h3 className="font-semibold text-gray-800 mb-3">📸 Tips for Better Diagnosis</h3>
+          <h3 className="font-semibold text-gray-800 mb-3">📸 {t('tipsBetterDiagnosis')}</h3>
           <ul className="space-y-2 text-sm text-gray-600">
             {[
               'Take photos in good natural daylight',

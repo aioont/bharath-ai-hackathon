@@ -47,7 +47,7 @@ const CROPS = [
 
 // ── Component ────────────────────────────────────────────────────────────────
 export default function InsuranceSuggestion() {
-    const { state } = useAppContext()
+    const { state, t } = useAppContext()
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const profile = state.userProfile as any
     const lang = state.selectedLanguage.code || 'en'
@@ -122,9 +122,9 @@ export default function InsuranceSuggestion() {
                             🛡️
                         </div>
                         <div>
-                            <h1 className="text-2xl font-bold tracking-tight">Insurance Advisor</h1>
+                            <h1 className="text-2xl font-bold tracking-tight">{t('insuranceTitle')}</h1>
                             <p className="text-teal-100 text-sm mt-1 max-w-md">
-                                Expert AI analysis of government schemes using <span className="font-semibold text-white">AWS Knowledge Base</span> & <span className="font-semibold text-white">myscheme.gov.in</span> real-time data.
+                                {t('govtSchemesAI')}
                             </p>
                         </div>
                     </div>
@@ -137,7 +137,7 @@ export default function InsuranceSuggestion() {
                         }`}
                     >
                         {autoSpeak ? <Volume2 size={16} className="animate-pulse" /> : <VolumeX size={16} />}
-                        {autoSpeak ? 'Voice Feedback ON' : 'Enable Voice'}
+                        {autoSpeak ? 'Voice Feedback ON' : t('enableVoice')}
                     </button>
                 </div>
             </div>
@@ -146,23 +146,23 @@ export default function InsuranceSuggestion() {
             {!result && (
                 <form onSubmit={handleSubmit} className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm space-y-6 relative overflow-visible">
                     <div className="absolute -top-3 left-6 px-3 py-1 bg-teal-50 text-teal-700 text-xs font-bold uppercase tracking-wider rounded border border-teal-100 shadow-sm">
-                        ENTER DETAILS
+                        {t('enterDetails')}
                     </div>
                     
                     <p className="text-sm text-gray-400 bg-teal-50 rounded-xl px-4 py-3 border border-teal-100 flex items-center gap-2">
-                        <span className="text-xl">💡</span> We pre-filled this form from your profile. Update fields if needed to get the most accurate insurance suggestions.
+                        <span className="text-xl">💡</span> {t('prefillNote')}
                     </p>
 
                     <div className="grid md:grid-cols-2 gap-6">
                         {/* 1. Basic Info Section */}
                         <div className="bg-sky-50 rounded-xl p-4 border border-sky-100 relative group hover:border-sky-300 transition-colors">
                             <h3 className="text-xs font-bold text-sky-700 uppercase tracking-wide mb-4 flex items-center gap-2">
-                                <span className="bg-sky-200 text-sky-800 rounded px-1.5 py-0.5">Step 1</span> Personal Details
+                                <span className="bg-sky-200 text-sky-800 rounded px-1.5 py-0.5">{t('step1')}</span> {t('personalDetails')}
                             </h3>
                             <div className="space-y-3">
                                 {[
-                                    { key: 'name', label: 'Full Name', placeholder: 'e.g. Ramesh Kumar', type: 'text' },
-                                    { key: 'age', label: 'Age', placeholder: 'e.g. 42', type: 'number' },
+                                    { key: 'name', label: t('fullName'), placeholder: 'e.g. Ramesh Kumar', type: 'text' },
+                                    { key: 'age', label: t('ageLabel'), placeholder: 'e.g. 42', type: 'number' },
                                 ].map(f => (
                                     <div key={f.key}>
                                         <label className="text-xs font-medium text-gray-500 block mb-1">{f.label}</label>
@@ -176,7 +176,7 @@ export default function InsuranceSuggestion() {
                                 ))}
                                 <div className="grid grid-cols-2 gap-3">
                                     <div>
-                                        <label className="text-xs font-medium text-gray-500 block mb-1">Gender</label>
+                                        <label className="text-xs font-medium text-gray-500 block mb-1">{t('genderLabel')}</label>
                                         <select value={form.gender} onChange={e => set('gender', e.target.value)}
                                             className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500">
                                             <option value="">Select</option>
@@ -184,7 +184,7 @@ export default function InsuranceSuggestion() {
                                         </select>
                                     </div>
                                     <div>
-                                        <label className="text-xs font-medium text-gray-500 block mb-1">Category</label>
+                                        <label className="text-xs font-medium text-gray-500 block mb-1">{t('categoryLabel')}</label>
                                         <select value={form.category} onChange={e => set('category', e.target.value)}
                                             className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500">
                                             {CATEGORIES.map(c => <option key={c}>{c}</option>)}
@@ -197,19 +197,19 @@ export default function InsuranceSuggestion() {
                         {/* 2. Location Section */}
                         <div className="bg-amber-50 rounded-xl p-4 border border-amber-100 relative group hover:border-amber-300 transition-colors">
                             <h3 className="text-xs font-bold text-amber-700 uppercase tracking-wide mb-4 flex items-center gap-2">
-                                <span className="bg-amber-200 text-amber-800 rounded px-1.5 py-0.5">Step 2</span> Location
+                                <span className="bg-amber-200 text-amber-800 rounded px-1.5 py-0.5">{t('step2')}</span> {t('locationLabel')}
                             </h3>
                             <div className="space-y-3">
                                 <div>
-                                    <label className="text-xs font-medium text-gray-500 block mb-1">State <span className="text-red-400">*</span></label>
+                                    <label className="text-xs font-medium text-gray-500 block mb-1">{t('stateLabel')} <span className="text-red-400">*</span></label>
                                     <select required value={form.state} onChange={e => set('state', e.target.value)}
                                         className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500">
-                                        <option value="">Select state</option>
+                                        <option value="">{t('selectState')}</option>
                                         {STATES.map(s => <option key={s}>{s}</option>)}
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="text-xs font-medium text-gray-500 block mb-1">District</label>
+                                    <label className="text-xs font-medium text-gray-500 block mb-1">{t('districtLabel')}</label>
                                     <input type="text" placeholder="e.g. Nashik"
                                         value={form.district} onChange={e => set('district', e.target.value)}
                                         className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500" />
@@ -221,11 +221,11 @@ export default function InsuranceSuggestion() {
                     {/* 3. Farm Details Section (Full Width) */}
                     <div className="bg-emerald-50 rounded-xl p-4 border border-emerald-100 relative group hover:border-emerald-300 transition-colors">
                         <h3 className="text-xs font-bold text-emerald-700 uppercase tracking-wide mb-4 flex items-center gap-2">
-                            <span className="bg-emerald-200 text-emerald-800 rounded px-1.5 py-0.5">Step 3</span> Farm & Crop Details
+                            <span className="bg-emerald-200 text-emerald-800 rounded px-1.5 py-0.5">{t('step3')}</span> {t('farmCropDetails')}
                         </h3>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                             <div className="col-span-2 md:col-span-1">
-                                <label className="text-xs font-medium text-gray-500 block mb-1">Primary Crop <span className="text-red-400">*</span></label>
+                                <label className="text-xs font-medium text-gray-500 block mb-1">{t('primaryCrop')} <span className="text-red-400">*</span></label>
                                 <div className="space-y-1">
                                     {myCrops.length > 0 ? (
                                         <select
@@ -266,24 +266,24 @@ export default function InsuranceSuggestion() {
                                 </div>
                             </div>
                             <div>
-                                <label className="text-xs font-medium text-gray-500 block mb-1">Land (acres)</label>
+                                <label className="text-xs font-medium text-gray-500 block mb-1">{t('landAcres')}</label>
                                 <input type="number" step="0.5" placeholder="e.g. 3.5"
                                     value={form.land_acres} onChange={e => set('land_acres', e.target.value)}
                                     className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500" />
                             </div>
                             <div>
-                                <label className="text-xs font-medium text-gray-500 block mb-1">Farming Type</label>
+                                <label className="text-xs font-medium text-gray-500 block mb-1">{t('farmingType')}</label>
                                 <select value={form.farming_type} onChange={e => set('farming_type', e.target.value)}
                                     className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500">
-                                    <option value="">Select type</option>
+                                    <option value="">{t('selectCrop')}</option>
                                     {FARMING_TYPES.map(f => <option key={f}>{f}</option>)}
                                 </select>
                             </div>
                             <div>
-                                <label className="text-xs font-medium text-gray-500 block mb-1">Income Level</label>
+                                <label className="text-xs font-medium text-gray-500 block mb-1">{t('incomeLevel')}</label>
                                 <select value={form.income_level} onChange={e => set('income_level', e.target.value)}
                                     className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500">
-                                    <option value="">Select level</option>
+                                    <option value="">{t('selectSoil')}</option>
                                     {INCOME_LEVELS.map(l => <option key={l}>{l}</option>)}
                                 </select>
                             </div>
@@ -293,8 +293,8 @@ export default function InsuranceSuggestion() {
                     <button type="submit" disabled={loading}
                         className="w-full bg-gradient-to-r from-teal-600 to-emerald-600 text-white py-3 rounded-xl font-semibold text-sm hover:from-teal-700 hover:to-emerald-700 transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-md">
                         {loading
-                            ? <><Sparkles size={16} className="animate-spin" /> Analysing with AI + AWS…</>
-                            : <><Shield size={16} /> Find My Best Insurance Schemes</>
+                            ? <><Sparkles size={16} className="animate-spin" /> {t('analysingAI')}</>
+                            : <><Shield size={16} /> {t('findSchemes')}</>
                         }
                     </button>
                 </form>
@@ -315,7 +315,7 @@ export default function InsuranceSuggestion() {
                         <div className="bg-white rounded-[1.4rem] p-6 relative z-10">
                             <h3 className="text-sm font-bold text-indigo-600 mb-4 flex items-center gap-3 uppercase tracking-wider">
                                 <span className="p-1.5 bg-indigo-50 rounded-lg"><Sparkles size={18} /></span> 
-                                AI Strategic Analysis
+                                {t('aiAnalysis')}
                             </h3>
                             <div className="text-sm leading-relaxed prose prose-sm prose-indigo max-w-none
                                 prose-headings:font-bold prose-headings:text-gray-900 
@@ -336,7 +336,7 @@ export default function InsuranceSuggestion() {
                         <div className="flex items-center justify-between mb-4 px-1">
                             <h3 className="text-sm font-bold text-teal-900 flex items-center gap-2">
                                 <span className="bg-gradient-to-br from-teal-400 to-emerald-500 text-white p-1.5 rounded-lg shadow-sm"><Shield size={14} /></span>
-                                Best Matching Schemes
+                                {t('bestSchemes')}
                             </h3>
                             <span className="text-[10px] font-bold uppercase tracking-wider text-teal-600 bg-teal-50 px-2.5 py-1 rounded-full border border-teal-100">
                                 {result.top_schemes.length} Options
@@ -428,7 +428,7 @@ export default function InsuranceSuggestion() {
 
                     <button onClick={() => setResult(null)}
                         className="flex items-center gap-1 text-xs text-teal-600 hover:underline">
-                        <RefreshCw size={12} /> Start over
+                        <RefreshCw size={12} /> {t('startOver')}
                     </button>
                 </div>
             )}

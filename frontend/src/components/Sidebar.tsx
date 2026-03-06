@@ -8,14 +8,14 @@ import { useAppContext } from '@/context/AppContext'
 import { SUPPORTED_LANGUAGES } from '@/utils/constants'
 
 const navItems = [
-  { to: '/', label: 'Home', icon: Home },
-  { to: '/chat', label: 'AgriSaarthi', icon: Mic, color: 'text-orange-500' },
-  { to: '/forum', label: 'Community Forum', icon: Users },
-  { to: '/crop-health', label: 'Crop Health', icon: Leaf },
-  { to: '/insurance', label: 'Insurance Advisor', icon: Shield },
-  { to: '/market', label: 'Market Prices', icon: TrendingUp },
-  { to: '/weather', label: 'Weather', icon: CloudSun },
-  { to: '/translate', label: 'Translate', icon: Languages },
+  { to: '/', labelKey: 'home', icon: Home },
+  { to: '/chat', labelKey: 'chatTitle', icon: Mic, color: 'text-orange-500' },
+  { to: '/forum', labelKey: 'forumTitle', icon: Users },
+  { to: '/crop-health', labelKey: 'cropHealth', icon: Leaf },
+  { to: '/insurance', labelKey: 'insurance', icon: Shield },
+  { to: '/market', labelKey: 'marketTitle', icon: TrendingUp },
+  { to: '/weather', labelKey: 'weather', icon: CloudSun },
+  { to: '/translate', labelKey: 'translateTitle', icon: Languages },
 ]
 
 export default function Sidebar() {
@@ -35,8 +35,8 @@ export default function Sidebar() {
             🌾
           </div>
           <div>
-            <h2 className="font-bold text-gray-900 text-sm">Agri-Translate AI</h2>
-            <p className="text-xs text-primary-600">Powered by Sarvam AI</p>
+            <h2 className="font-bold text-gray-900 text-sm">{t('chatTitle')}</h2>
+            <p className="text-xs text-primary-600">{t('appTagline')}</p>
           </div>
         </div>
       </div>
@@ -44,7 +44,7 @@ export default function Sidebar() {
       {/* Language — prominent display + expandable selector */}
       <div className="px-4 mb-4">
         <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
-          🌐 Your Language
+          🌐 {t('yourLanguage')}
         </p>
         {/* Current language pill — always visible */}
         <div
@@ -93,7 +93,7 @@ export default function Sidebar() {
         <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-1 mb-2">{t('features')}</p>
         {authUser ? (
           <ul className="space-y-1">
-            {navItems.map(({ to, label, icon: Icon }) => (
+            {navItems.map(({ to, labelKey, icon: Icon }) => (
               <li key={to}>
                 <NavLink
                   to={to}
@@ -103,7 +103,7 @@ export default function Sidebar() {
                   }
                 >
                   <Icon size={18} />
-                  <span className="text-sm">{label}</span>
+                  <span className="text-sm">{t(labelKey!)}</span>
                 </NavLink>
               </li>
             ))}
@@ -145,7 +145,7 @@ export default function Sidebar() {
               className={({ isActive }) => isActive ? 'nav-link-active' : 'nav-link'}
             >
               <Settings size={18} />
-              <span className="text-sm">Admin Panel</span>
+              <span className="text-sm">{t('adminPanel')}</span>
             </NavLink>
           </>
         )}

@@ -1,4 +1,4 @@
-# Agri-Translate AI Frontend 🌾
+# Agri AI Frontend 🌾
 
 > **Production-grade Progressive Web App (PWA) for India's 270M+ Farmers**  
 > **Award-Winning UX:** React + TypeScript • Offline-First • Voice-Native • 15 Languages
@@ -16,7 +16,7 @@
 ### Problem Understanding
 Indian farmers struggle with:
 - **Digital literacy gap** - 68% unfamiliar with smartphone apps
-- **Language barrier** - 22 official languages, 720+ dialects
+- **Language barrier** - 15 official languages, 720+ dialects
 - **Connectivity issues** - Intermittent network in rural areas
 - **Complex interfaces** - Most apps designed for urban users
 
@@ -410,7 +410,7 @@ const stats = await getCacheStats()
 **Features:**
 ```json
 {
-  "name": "Agri-Translate AI",
+  "name": "Agri AI",
   "short_name": "AgriAI",
   "display": "standalone",        // Hides browser UI
   "orientation": "portrait",       // Mobile-first

@@ -69,12 +69,12 @@ export const DISEASE_SEVERITY = {
 }
 
 export const EXPERT_CATEGORIES = [
-  { id: 'crop-management', label: 'Crop Management', icon: '🌾' },
-  { id: 'pest-control', label: 'Pest Control', icon: '🐛' },
-  { id: 'soil-health', label: 'Soil Health', icon: '🌱' },
-  { id: 'water-management', label: 'Water Management', icon: '💧' },
-  { id: 'market-advisory', label: 'Market Advisory', icon: '📈' },
-  { id: 'weather-advice', label: 'Weather Advice', icon: '🌤️' },
-  { id: 'organic-farming', label: 'Organic Farming', icon: '♻️' },
-  { id: 'government-schemes', label: 'Govt. Schemes', icon: '🏛️' },
+  { id: 'crop-management', label: 'Crop Management', labelKey: 'catCropManagement', icon: '🌾' },
+  { id: 'pest-control', label: 'Pest Control', labelKey: 'catPestControl', icon: '🐛' },
+  { id: 'soil-health', label: 'Soil Health', labelKey: 'catSoilHealth', icon: '🌱' },
+  { id: 'water-management', label: 'Water Management', labelKey: 'catWaterManagement', icon: '💧' },
+  { id: 'market-advisory', label: 'Market Advisory', labelKey: 'catMarketAdvisory', icon: '📈' },
+  { id: 'weather-advice', label: 'Weather Advice', labelKey: 'catWeatherAdvice', icon: '🌤️' },
+  { id: 'organic-farming', label: 'Organic Farming', labelKey: 'catOrganicFarming', icon: '♻️' },
+  { id: 'government-schemes', label: 'Govt. Schemes', labelKey: 'catGovtSchemes', icon: '🏛️' },
 ]

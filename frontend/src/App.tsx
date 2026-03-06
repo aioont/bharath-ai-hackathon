@@ -16,6 +16,8 @@ import VerifyEmail from '@/pages/VerifyEmail'
 import PWAInstallBanner from '@/components/PWAInstallBanner'
 import OfflineBanner from '@/components/OfflineBanner'
 import EvalDashboard from '@/pages/EvalDashboard'
+import AdminTables from '@/pages/AdminTables'
+import AdminCache from '@/pages/AdminCache'
 import InsuranceSuggestion from '@/pages/InsuranceSuggestion'
 import AdminGate from '@/components/AdminGate'
 
@@ -38,6 +40,8 @@ export default function App() {
             <Route path="/register" element={<Register />} />
             <Route path="/verify-email" element={<VerifyEmail />} />
             <Route path="/admin/eval" element={<AdminGate><EvalDashboard /></AdminGate>} />
+            <Route path="/admin/tables" element={<AdminGate><AdminTables /></AdminGate>} />
+            <Route path="/admin/cache" element={<AdminGate><AdminCache /></AdminGate>} />
             <Route path="/insurance" element={<InsuranceSuggestion />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

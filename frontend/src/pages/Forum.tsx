@@ -197,13 +197,13 @@ export default function Forum() {
             onClick={() => setViewMode('all')}
             className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${viewMode === 'all' ? 'bg-primary-600 text-white' : 'bg-white text-gray-500 border border-gray-200'}`}
           >
-            All Questions
+            {t('allQuestions')}
           </button>
           <button
             onClick={() => setViewMode('mine')}
             className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${viewMode === 'mine' ? 'bg-primary-600 text-white' : 'bg-white text-gray-500 border border-gray-200'}`}
           >
-            <User size={12} /> My Questions
+            <User size={12} /> {t('myQuestions')}
           </button>
         </div>
       )}
@@ -257,7 +257,7 @@ export default function Forum() {
             >
               <option value="">Select Category</option>
               {EXPERT_CATEGORIES.map((cat) => (
-                <option key={cat.id} value={cat.id}>{cat.icon} {cat.label}</option>
+                <option key={cat.id} value={cat.id}>{cat.icon} {cat.labelKey ? t(cat.labelKey) : cat.label}</option>
               ))}
             </select>
             <input
@@ -306,7 +306,7 @@ export default function Forum() {
               !category ? 'bg-primary-600 text-white border-primary-600' : 'bg-white text-gray-500 border-gray-200'
             }`}
           >
-            All
+            {t('forumAll')}
           </button>
           {EXPERT_CATEGORIES.map((cat) => (
             <button
@@ -316,12 +316,12 @@ export default function Forum() {
                 category === cat.id ? 'bg-primary-600 text-white border-primary-600' : 'bg-white text-gray-500 border-gray-200 hover:border-primary-300'
               }`}
             >
-              {cat.icon} {cat.label}
+              {cat.icon} {cat.labelKey ? t(cat.labelKey) : cat.label}
             </button>
           ))}
         </div>
         <div className="flex items-center justify-between">
-          <span className="text-xs font-medium text-gray-500">🕒 Sorted by Latest</span>
+          <span className="text-xs font-medium text-gray-500">🕒 {t('sortedByLatest')}</span>
           <span className="text-xs text-gray-400">{filtered.length} questions</span>
         </div>
       </div>
@@ -353,7 +353,7 @@ export default function Forum() {
                         )}
                         {catInfo && (
                           <span className="badge bg-primary-50 text-primary-700 text-xs">
-                            {catInfo.icon} {catInfo.label}
+                            {catInfo.icon} {catInfo.labelKey ? t(catInfo.labelKey) : catInfo.label}
                           </span>
                         )}
                         <span className="text-xs text-gray-400">{langLabel(post.language)}</span>

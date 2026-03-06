@@ -105,7 +105,7 @@ function SpeakerButton({
 
 // ─── Main Navbar ──────────────────────────────────────────────────────────────
 export default function Navbar() {
-  const { state, dispatch, logout } = useAppContext()
+  const { state, dispatch, logout, t } = useAppContext()
   const navigate = useNavigate()
   const authUser = state.authUser
   const userProfile = state.userProfile
@@ -185,7 +185,7 @@ export default function Navbar() {
   const emoji = conditionEmoji[current?.condition ?? ''] ?? '🌤️'
 
   return (
-    <header className="sticky top-0 z-20 bg-white border-b border-gray-100 shadow-sm">
+    <header className="sticky top-0 z-[60] bg-white border-b border-gray-100 shadow-sm">
       <div className="flex items-center justify-between h-16 px-4 max-w-7xl mx-auto">
         {/* Left: Hamburger + Logo */}
         <div className="flex items-center gap-3">
@@ -202,8 +202,8 @@ export default function Navbar() {
               🌾
             </div>
             <div className="hidden sm:block">
-              <h1 className="text-base font-bold text-gray-900 leading-none">Agri-Translate AI</h1>
-              <p className="text-xs text-primary-600 font-medium">Powered by Sarvam AI</p>
+              <h1 className="text-base font-bold text-gray-900 leading-none">{t('chatTitle')}</h1>
+              <p className="text-xs text-primary-600 font-medium">{t('appTagline')}</p>
             </div>
           </div>
         </div>
@@ -211,10 +211,16 @@ export default function Navbar() {
         {/* Right: Controls */}
         <div className="flex items-center gap-2">
           {/* Online indicator */}
-          <div className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium ${state.isOnline ? 'bg-primary-50 text-primary-700' : 'bg-red-50 text-red-600'
-            }`}>
+          <div
+            title={state.isOnline ? "You are connected to the internet" : "No internet connection"}
+            className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium ${
+              state.isOnline
+                ? 'bg-primary-50 text-primary-700'
+                : 'bg-red-50 text-red-600'
+            }`}
+          >
             {state.isOnline ? <Wifi size={12} /> : <WifiOff size={12} />}
-            {state.isOnline ? 'Online' : 'Offline'}
+            {state.isOnline ? 'Connected' : 'Offline'}
           </div>
 
           {/* Language selector */}

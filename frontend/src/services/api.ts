@@ -71,6 +71,7 @@ export interface ChatRequest {
   message: string
   language: string
   conversation_history?: ChatMessage[]
+  conversation_uuid?: string  // For continuing existing conversations
   category?: string
   tts_enabled?: boolean
   farmer_profile?: {
@@ -109,6 +110,63 @@ export interface ChatResponse {
 
 export const sendChatMessage = (data: ChatRequest) =>
   api.post<ChatResponse>('/api/chat', data).then((r) => r.data)
+
+// ─── Chat History ──────────────────────────────────────────────────────────────
+export interface Conversation {
+  id: number
+  conversation_uuid: string
+  title: string
+  language: string
+  category: string
+  message_count: number
+  created_at: string
+  updated_at: string
+}
+
+export interface ConversationDetail {
+  conversation: Conversation
+  messages: Array<ChatMessage & {
+    id?: number
+    model_used?: string
+    tokens_used?: number
+    cached_response?: boolean
+    created_at: string
+    audio_base64?: string
+    audio_format?: string
+  }>
+  message_count: number
+}
+
+export interface ChatAnalytics {
+  user_id: string
+  period_days: number
+  total_messages: number
+  conversations: number
+  cache_hit_rate: number
+  total_tokens: number
+  avg_response_time_ms: number
+  total_audio_kb?: number
+}
+
+export const getConversations = (category?: string, limit = 20, offset = 0) => {
+  const params = new URLSearchParams()
+  if (category) params.append('category', category)
+  params.append('limit', String(limit))
+  params.append('offset', String(offset))
+  return api.get<{ conversations: Conversation[]; total: number }>(`/api/chat/conversations?${params}`).then((r) => r.data)
+}
+
+export const getConversation = (conversationUuid: string, includeAudio = false) =>
+  api.get<ConversationDetail>(`/api/chat/conversations/${conversationUuid}?include_audio=${includeAudio}`).then((r) => r.data)
+
+export const getChatAnalytics = (days = 7) =>
+  api.get<ChatAnalytics>(`/api/chat/analytics?days=${days}`).then((r) => r.data)
+
+export const getChatHistory = (includeAudio = false) =>
+  api.get<ConversationDetail>(`/api/chat/history?include_audio=${includeAudio}`).then((r) => r.data)
+
+export const clearChatHistory = () =>
+  api.delete<{ success: boolean; message: string }>('/api/chat/history').then((r) => r.data)
 
 // ─── Crop Health ───────────────────────────────────────────────────────────────
 export interface CropHealthResponse {

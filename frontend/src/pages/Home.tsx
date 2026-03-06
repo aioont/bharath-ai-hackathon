@@ -119,7 +119,7 @@ export default function Home() {
                   onClick={() => navigate('/profile')}
                   className="badge bg-white/20 text-white border-0 text-xs hover:bg-white/30 transition-colors"
                 >
-                  📝 Complete your profile
+                  📝 {t('completeProfile')}
                 </button>
               </div>
             )}
@@ -133,8 +133,8 @@ export default function Home() {
                 </h1>
                 <p className="text-primary-100 text-sm sm:text-base max-w-2xl leading-relaxed">
                   {profile?.state && profile?.isProfileComplete
-                    ? `Your intelligent farming companion for ${profile.state}. Access AI-powered crop guidance, real-time market intelligence, weather alerts, and community wisdom — all in your preferred language.`
-                    : 'Welcome to India\'s most comprehensive agricultural platform. Get personalized AI assistance, market insights, weather forecasts, crop diagnostics, and connect with farmers nationwide — all powered by cutting-edge technology.'}
+                    ? t('homeCardDesc').replace('{state}', profile.state)
+                    : t('homeCardDescGeneral')}
                 </p>
               </div>
               <div className="text-5xl sm:text-6xl flex-shrink-0 hidden sm:block animate-bounce-slow">🌾</div>
@@ -157,7 +157,7 @@ export default function Home() {
                 px-5 py-3 rounded-xl hover:bg-white/30 active:scale-95 transition-all border border-white/30 backdrop-blur-sm"
             >
               <TrendingUp size={18} />
-              Market Prices
+              {t('marketTitle')}
             </button>
             <button
               onClick={() => navigate('/weather')}
@@ -165,7 +165,7 @@ export default function Home() {
                 px-5 py-3 rounded-xl hover:bg-white/30 active:scale-95 transition-all border border-white/30 backdrop-blur-sm"
             >
               <CloudSun size={18} />
-              Weather
+              {t('weather')}
             </button>
           </div>
         </div>
@@ -253,7 +253,7 @@ export default function Home() {
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full mb-3 text-xs font-semibold tracking-widest uppercase"
               style={{ background: 'rgba(134,239,172,0.12)', border: '1px solid rgba(134,239,172,0.3)', color: '#86efac' }}>
               <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-              Powered by Sarvam AI
+              {t('langSupported')}
             </div>
 
             {/* Main heading — shimmer text */}
@@ -261,14 +261,12 @@ export default function Home() {
               className="animate-text-shimmer text-2xl sm:text-3xl lg:text-4xl font-black leading-tight mb-3"
               style={{ fontFamily: 'system-ui, sans-serif', letterSpacing: '-0.02em' }}
             >
-              Autonomous Multilingual<br />
-              Farm Decision &amp; Risk<br />
-              Intelligence Agent
+              {t('agentHeading')}
             </h2>
 
             {/* Sub-caption */}
             <p className="text-green-200/70 text-sm sm:text-base mb-5 max-w-md mx-auto sm:mx-0 leading-relaxed">
-              Revolutionary AI agent that understands 15+ Indian languages through voice & text. Autonomous decision-making system combining real-time IoT sensor data, market intelligence, weather patterns & government schemes — delivering personalized farm guidance without human intervention.
+              {t('agentSubCaption')}
             </p>
 
             {/* CTA row */}
@@ -287,14 +285,14 @@ export default function Home() {
                   <line x1="12" y1="19" x2="12" y2="22" />
                   <line x1="8" y1="22" x2="16" y2="22" />
                 </svg>
-                Talk to AI Agent
+                {t('talkToAgent')}
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
                   <path d="M5 12h14M12 5l7 7-7 7" />
                 </svg>
               </div>
               <div className="text-green-300/60 text-xs font-medium flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-                15+ languages supported
+                {t('langSupported')}
               </div>
             </div>
           </div>
@@ -321,8 +319,8 @@ export default function Home() {
 
       {/* Features Grid */}
       <section>
-        <h2 className="section-title">What can I help you with?</h2>
-        <p className="section-subtitle">Tap any feature to get started</p>
+        <h2 className="section-title">{t('whatCanIHelp')}</h2>
+        <p className="section-subtitle">{t('tapFeature')}</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {features.map((feature) => (
             <button
@@ -355,8 +353,8 @@ export default function Home() {
 
       {/* Crop Categories */}
       <section>
-        <h2 className="section-title">Crop Categories</h2>
-        <p className="section-subtitle">Find specific advice for your crop type</p>
+        <h2 className="section-title">{t('cropCategories')}</h2>
+        <p className="section-subtitle">{t('findCropAdvice')}</p>
         <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-2">
           {CROP_CATEGORIES.map((cat) => (
             <button
@@ -375,12 +373,12 @@ export default function Home() {
 
       {/* Why AI section */}
       <section className="card bg-gradient-to-br from-earth-50 to-primary-50 border border-earth-100">
-        <h2 className="section-title text-xl">Why AI for Agriculture?</h2>
+        <h2 className="section-title text-xl">{t('whyAI')}</h2>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4">
           {[
-            { icon: <Zap className="text-yellow-500" size={20} />, title: 'Real-time Adaptation', desc: 'AI continuously learns and adapts to market prices, weather conditions, and pest outbreaks' },
-            { icon: <Shield className="text-blue-500" size={20} />, title: 'Contextual Intelligence', desc: 'Recommendations consider soil type, local weather, and market trends for personalized advice' },
-            { icon: <Sprout className="text-primary-500" size={20} />, title: 'Unmatched Scale', desc: 'Foundation models efficiently handle 15+ languages and 100+ crop types simultaneously' },
+            { icon: <Zap className="text-yellow-500" size={20} />, title: t('realTimeAdaptation'), desc: t('realTimeAdaptationDesc') },
+            { icon: <Shield className="text-blue-500" size={20} />, title: t('contextualIntelligence'), desc: t('contextualIntelligenceDesc') },
+            { icon: <Sprout className="text-primary-500" size={20} />, title: t('unmatchedScale'), desc: t('unmatchedScaleDesc') },
           ].map((item) => (
             <div key={item.title} className="flex gap-3">
               <div className="flex-shrink-0 w-9 h-9 bg-white rounded-xl flex items-center justify-center shadow-sm">
@@ -403,8 +401,8 @@ export default function Home() {
               <Newspaper size={18} className="text-green-700" />
             </div>
             <div>
-              <h3 className="font-bold text-gray-900 text-sm">Latest Agri News</h3>
-              <p className="text-xs text-gray-500">Powered by RuralVoice</p>
+              <h3 className="font-bold text-gray-900 text-sm">{t('latestNews')}</h3>
+              <p className="text-xs text-gray-500">Latest updates and news from the agriculture sector.</p>
             </div>
           </div>
           <a
@@ -413,7 +411,7 @@ export default function Home() {
             rel="noopener noreferrer"
             className="flex items-center gap-1 text-xs text-green-700 hover:text-green-900 font-medium"
           >
-            View all <ExternalLink size={11} />
+            {t('viewAll')} <ExternalLink size={11} />
           </a>
         </div>
 

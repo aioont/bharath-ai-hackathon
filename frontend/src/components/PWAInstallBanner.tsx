@@ -3,7 +3,7 @@ import { Download, X, Smartphone } from 'lucide-react'
 import { useAppContext } from '@/context/AppContext'
 
 export default function PWAInstallBanner() {
-  const { state, installApp } = useAppContext()
+  const { state, installApp, t } = useAppContext()
   const [dismissed, setDismissed] = useState(false)
   const [visible, setVisible] = useState(false)
 
@@ -34,7 +34,7 @@ export default function PWAInstallBanner() {
         <Smartphone size={22} />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="font-semibold text-sm">Install Agri-Translate AI</p>
+        <p className="font-semibold text-sm">Install {t('appName')}</p>
         <p className="text-xs text-primary-200 truncate">Access offline & get instant updates</p>
       </div>
       <button

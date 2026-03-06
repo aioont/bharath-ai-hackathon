@@ -15,7 +15,7 @@
 
 ### Problem Statement Addressed
 Indian agriculture faces a **critical information accessibility crisis**:
-- 📚 **Language Barrier**: 22 official languages, 720+ dialects — Most content in English only
+- 📚 **Language Barrier**: 15 official languages, 720+ dialects — Most content in English only
 - 📱 **Digital Literacy**: 68% of farmers unfamiliar with smartphone apps
 - 🌐 **Connectivity**: Intermittent network in rural areas (2G/3G predominant)
 - 💸 **Scattered Resources**: Market prices, weather, schemes fragmented across 100+ portals

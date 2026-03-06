@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion'
 import { Sprout, TrendingUp, CloudSun, Scale, Activity } from 'lucide-react'
+import { useAppContext } from '@/context/AppContext'
 
 export type TopicType = 'general' | 'crop_doctor' | 'market' | 'weather' | 'schemes'
 
@@ -10,16 +11,17 @@ interface TopicSelectorProps {
 }
 
 const TOPICS = [
-  { id: 'general', label: 'General Expert', icon: Sprout, color: 'bg-green-100 text-green-700 border-green-200' },
-  { id: 'crop_doctor', label: 'Crop Doctor', icon: Activity, color: 'bg-red-100 text-red-700 border-red-200' },
-  { id: 'market', label: 'Market Prices', icon: TrendingUp, color: 'bg-blue-100 text-blue-700 border-blue-200' },
-  { id: 'weather', label: 'Weather', icon: CloudSun, color: 'bg-sky-100 text-sky-700 border-sky-200' },
-  { id: 'schemes', label: 'Govt Schemes', icon: Scale, color: 'bg-amber-100 text-amber-700 border-amber-200' },
+  { id: 'general', labelKey: 'topicGeneral', icon: Sprout, color: 'bg-green-100 text-green-700 border-green-200' },
+  { id: 'crop_doctor', labelKey: 'topicCropDoctor', icon: Activity, color: 'bg-red-100 text-red-700 border-red-200' },
+  { id: 'market', labelKey: 'topicMarket', icon: TrendingUp, color: 'bg-blue-100 text-blue-700 border-blue-200' },
+  { id: 'weather', labelKey: 'topicWeather', icon: CloudSun, color: 'bg-sky-100 text-sky-700 border-sky-200' },
+  { id: 'schemes', labelKey: 'topicSchemes', icon: Scale, color: 'bg-amber-100 text-amber-700 border-amber-200' },
 ]
 
 export default function TopicSelector({ selectedTopic, onSelect, disabled }: TopicSelectorProps) {
+  const { t } = useAppContext()
   return (
-    <div className="w-full overflow-x-auto p-2 scrollbar-hide">
+    <div className="w-full overflow-x-auto p-1 scrollbar-hide">
       <div className="flex gap-2 min-w-max px-1">
         {TOPICS.map((topic) => {
           const Icon = topic.icon
@@ -32,7 +34,7 @@ export default function TopicSelector({ selectedTopic, onSelect, disabled }: Top
               onClick={() => onSelect(topic.id as TopicType)}
               disabled={disabled}
               className={`
-                flex items-center gap-2 px-4 py-2 rounded-full border text-sm font-medium transition-all
+                flex items-center gap-1 px-2 py-1 rounded-full border text-sm font-medium transition-all
                 ${isSelected 
                   ? `${topic.color} ring-2 ring-offset-1 ring-green-600 shadow-sm` 
                   : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
@@ -41,7 +43,7 @@ export default function TopicSelector({ selectedTopic, onSelect, disabled }: Top
               `}
             >
               <Icon className="w-4 h-4" />
-              {topic.label}
+              {topic.labelKey ? t(topic.labelKey) : ''}
             </motion.button>
           )
         })}

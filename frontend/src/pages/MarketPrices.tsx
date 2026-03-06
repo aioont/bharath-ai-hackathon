@@ -1,27 +1,15 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Search, TrendingUp, TrendingDown, Minus, RefreshCw, MapPin, Calendar } from 'lucide-react'
 import { getMarketPrices, getMarketFilters } from '@/services/api'
 import type { MarketPrice } from '@/services/api'
 import { SkeletonList } from '@/components/LoadingSpinner'
-
-// Demo data
-const DEMO_PRICES: MarketPrice[] = [
-  { commodity: 'Wheat', variety: 'Sharbati', market: 'Indore Mandi', state: 'Madhya Pradesh', min_price: 2100, max_price: 2350, modal_price: 2200, unit: 'Quintal', date: new Date().toISOString().slice(0, 10), trend: 'up', trend_percentage: 2.3 },
-  { commodity: 'Rice', variety: 'Basmati 1121', market: 'Karnal', state: 'Haryana', min_price: 3200, max_price: 3800, modal_price: 3500, unit: 'Quintal', date: new Date().toISOString().slice(0, 10), trend: 'stable', trend_percentage: 0.1 },
-  { commodity: 'Onion', variety: 'Red Medium', market: 'Lasalgaon', state: 'Maharashtra', min_price: 800, max_price: 1400, modal_price: 1100, unit: 'Quintal', date: new Date().toISOString().slice(0, 10), trend: 'down', trend_percentage: -5.2 },
-  { commodity: 'Tomato', variety: 'Local', market: 'Kolar', state: 'Karnataka', min_price: 600, max_price: 1600, modal_price: 1200, unit: 'Quintal', date: new Date().toISOString().slice(0, 10), trend: 'up', trend_percentage: 15.8 },
-  { commodity: 'Potato', variety: 'Kufri Jyoti', market: 'Agra', state: 'Uttar Pradesh', min_price: 1200, max_price: 1600, modal_price: 1400, unit: 'Quintal', date: new Date().toISOString().slice(0, 10), trend: 'stable', trend_percentage: 0.5 },
-  { commodity: 'Soybean', variety: 'Yellow', market: 'Indore', state: 'Madhya Pradesh', min_price: 4200, max_price: 4600, modal_price: 4400, unit: 'Quintal', date: new Date().toISOString().slice(0, 10), trend: 'up', trend_percentage: 3.1 },
-  { commodity: 'Cotton', variety: 'Long Staple', market: 'Akola', state: 'Maharashtra', min_price: 6800, max_price: 7200, modal_price: 7000, unit: 'Quintal', date: new Date().toISOString().slice(0, 10), trend: 'down', trend_percentage: -1.4 },
-  { commodity: 'Groundnut', variety: 'Bold', market: 'Rajkot', state: 'Gujarat', min_price: 5200, max_price: 5800, modal_price: 5500, unit: 'Quintal', date: new Date().toISOString().slice(0, 10), trend: 'up', trend_percentage: 4.7 },
-  { commodity: 'Maize', variety: 'Yellow Flint', market: 'Davangere', state: 'Karnataka', min_price: 1800, max_price: 2100, modal_price: 1950, unit: 'Quintal', date: new Date().toISOString().slice(0, 10), trend: 'stable', trend_percentage: -0.3 },
-  { commodity: 'Mustard', variety: 'Yellow', market: 'Alwar', state: 'Rajasthan', min_price: 5100, max_price: 5700, modal_price: 5400, unit: 'Quintal', date: new Date().toISOString().slice(0, 10), trend: 'up', trend_percentage: 2.8 },
-]
+import { useAppContext } from '@/context/AppContext'
 
 export default function MarketPrices() {
-  const [prices, setPrices] = useState<MarketPrice[]>(DEMO_PRICES)
+  const { state: appState, t } = useAppContext()
+  const [prices, setPrices] = useState<MarketPrice[]>([])
   const [loading, setLoading] = useState(false)
-  const [search, setSearch] = useState('')
+  const [resultSearch, setResultSearch] = useState('')
   
   // Filter data from API
   const [commodities, setCommodities] = useState<Array<{ cmdt_id: number; cmdt_name: string }>>([])
@@ -29,13 +17,24 @@ export default function MarketPrices() {
   const [filtersLoading, setFiltersLoading] = useState(true)
   
   // Filter states
-  const [selectedCommodityId, setSelectedCommodityId] = useState<number>(3) // 3 = all commodities
-  const [selectedStateId, setSelectedStateId] = useState<number>(17) // 17 = all states (Kerala by default as per API)
+  const [selectedCommodityId, setSelectedCommodityId] = useState<number>(19) // 19 = Banana
+  const [selectedStateId, setSelectedStateId] = useState<number>(17)
+  const [isStateReady, setIsStateReady] = useState(false)
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
   
   const [sortBy, setSortBy] = useState<'commodity' | 'modal_price' | 'trend_percentage'>('commodity')
   const [lastUpdated, setLastUpdated] = useState(new Date())
+  const hasAutoFetched = useRef(false)
+
+  const profileStateName = appState.userProfile?.state?.trim() || ''
+
+  const normalizeStateName = (value: string) =>
+    value
+      .toLowerCase()
+      .replace(/[^a-z\s]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
 
   // Fetch filters on mount
   useEffect(() => {
@@ -48,6 +47,7 @@ export default function MarketPrices() {
         console.error('Failed to load filters:', err)
         // Set fallback data if API fails
         setCommodities([
+          { cmdt_id: 19, cmdt_name: 'Banana' },
           { cmdt_id: 3, cmdt_name: 'Rice' },
           { cmdt_id: 1, cmdt_name: 'Wheat' },
           { cmdt_id: 23, cmdt_name: 'Onion' },
@@ -73,6 +73,34 @@ export default function MarketPrices() {
     setFromDate(yesterday.toISOString().split('T')[0])
   }, [])
 
+  useEffect(() => {
+    if (!states.length) return
+
+    if (!profileStateName) {
+      setSelectedStateId(17)
+      setIsStateReady(true)
+      return
+    }
+
+    const normalizedProfileState = normalizeStateName(profileStateName)
+    const exactMatch = states.find(
+      (s) => normalizeStateName(s.state_name) === normalizedProfileState
+    )
+
+    const partialMatch =
+      exactMatch ||
+      states.find((s) => {
+        const normalizedState = normalizeStateName(s.state_name)
+        return (
+          normalizedState.includes(normalizedProfileState) ||
+          normalizedProfileState.includes(normalizedState)
+        )
+      })
+
+    setSelectedStateId(partialMatch?.state_id ?? 17)
+    setIsStateReady(true)
+  }, [states, profileStateName])
+
   const fetchPrices = async () => {
     setLoading(true)
     try {
@@ -84,17 +112,43 @@ export default function MarketPrices() {
       )
       setPrices(data.prices)
       setLastUpdated(new Date(data.last_updated))
-    } catch (_) {
-      // Keep demo data
+    } catch {
+      setPrices([])
     } finally {
       setLoading(false)
     }
   }
 
+  useEffect(() => {
+    if (hasAutoFetched.current) return
+    if (filtersLoading || !isStateReady || !fromDate || !toDate) return
+
+    hasAutoFetched.current = true
+    fetchPrices()
+  }, [filtersLoading, isStateReady, fromDate, toDate, selectedCommodityId, selectedStateId])
+
+  const searchQuery = resultSearch.trim().toLowerCase()
+
   const filtered = prices
-    .filter((p) =>
-      (!search || p.commodity.toLowerCase().includes(search.toLowerCase()) || p.market.toLowerCase().includes(search.toLowerCase()))
-    )
+    .filter((p) => {
+      if (!searchQuery) return true
+
+      const searchableText = [
+        p.commodity,
+        p.variety,
+        p.market,
+        p.state,
+        p.unit,
+        p.min_price.toString(),
+        p.modal_price.toString(),
+        p.max_price.toString(),
+        p.trend_percentage.toString(),
+      ]
+        .join(' ')
+        .toLowerCase()
+
+      return searchableText.includes(searchQuery)
+    })
     .sort((a, b) => {
       if (sortBy === 'modal_price') return b.modal_price - a.modal_price
       if (sortBy === 'trend_percentage') return b.trend_percentage - a.trend_percentage
@@ -115,7 +169,7 @@ export default function MarketPrices() {
       <div className="flex items-start justify-between">
         <div>
           <h1 className="section-title flex items-center gap-2 mb-0">
-            <span>📈</span> Market Prices
+            <span>📈</span> {t('marketTitle')}
           </h1>
           <p className="text-xs text-gray-500 mt-0.5">
             Live mandi prices • Updated: {lastUpdated.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
@@ -148,17 +202,6 @@ export default function MarketPrices() {
 
       {/* Filters */}
       <div className="space-y-3">
-        <div className="relative">
-          <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input
-            type="search"
-            placeholder="Search commodity or market..."
-            className="input-field pl-10"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
-        
         {/* Main Filters Row */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {/* Commodity Dropdown */}
@@ -233,7 +276,7 @@ export default function MarketPrices() {
             {loading ? (
               <>
                 <RefreshCw size={16} className="animate-spin" />
-                Loading...
+                {t('loading')}
               </>
             ) : (
               <>
@@ -257,6 +300,17 @@ export default function MarketPrices() {
           <div className="text-xs text-gray-500">
             {filtered.length} result{filtered.length !== 1 ? 's' : ''}
           </div>
+        </div>
+
+        <div className="relative">
+          <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            type="search"
+            placeholder="Search inside results (place, market, price...)"
+            className="input-field pl-10"
+            value={resultSearch}
+            onChange={(e) => setResultSearch(e.target.value)}
+          />
         </div>
       </div>
 

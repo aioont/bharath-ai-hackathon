@@ -10,7 +10,7 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'icons/*.png'],
       manifest: {
-        name: 'Agri-Translate AI',
+        name: 'AgriSaarthi',
         short_name: 'AgriAI',
         description: 'Multilingual AI Agricultural Assistant for Indian Farmers',
         theme_color: '#16a34a',

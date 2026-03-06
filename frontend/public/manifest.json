@@ -1,5 +1,5 @@
 {
-  "name": "Agri-Translate AI",
+  "name": "AgriSaarthi",
   "short_name": "AgriAI",
   "description": "Multilingual AI Agricultural Assistant powered by Amazon Bedrock. Empowering India's farmers.",
   "start_url": "/",
@@ -49,7 +49,7 @@
       "sizes": "1280x720",
       "type": "image/png",
       "form_factor": "wide",
-      "label": "Agri-Translate AI Home Screen"
+      "label": "AgriSaarthi Home Screen"
     }
   ],
   "related_applications": [],

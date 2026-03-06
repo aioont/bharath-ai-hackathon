@@ -33,13 +33,12 @@ export default function LanguageSelector({ compact, value, onChange, label }: La
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className={`flex items-center gap-2 w-full bg-white border-2 border-gray-200 rounded-xl 
+        className={`flex items-center gap-1 w-full bg-white border-2 border-gray-200 rounded-xl 
           hover:border-primary-400 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 
-          transition-all duration-200 ${compact ? 'px-3 py-2 text-sm' : 'px-4 py-3'}`}
+          transition-all duration-200 ${compact ? 'px-2 py-1 text-sm' : 'px-3 py-2'}`}
       >
-        <span className="text-xl leading-none">{current.flag}</span>
         <div className="flex-1 text-left min-w-0">
-          <div className="font-medium text-gray-800 truncate text-sm leading-none mb-0.5">{current.englishName}</div>
+          <div className="font-sm text-gray-800 truncate text-sm leading-none mb-0.5">{current.englishName}</div>
           <div className="text-gray-500 text-xs truncate">{current.name}</div>
         </div>
         <ChevronDown size={16} className={`text-gray-400 flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />

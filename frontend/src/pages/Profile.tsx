@@ -36,7 +36,14 @@ const IRRIGATION_OPTIONS = [
   { value: 'borewell', label: 'Borewell', icon: '⛽' },
   { value: 'other', label: 'Other', icon: '🔧' },
 ]
-
+const SEASON_LABEL_KEY: Record<string, string> = {
+  kharif: 'seasonKharif', rabi: 'seasonRabi', zaid: 'seasonZaid',
+  perennial: 'seasonPerennial', 'all-season': 'seasonAllSeason',
+}
+const IRRIG_LABEL_KEY: Record<string, string> = {
+  rainfed: 'irrigRainfed', canal: 'irrigCanal', drip: 'irrigDrip',
+  sprinkler: 'irrigSprinkler', borewell: 'irrigBorewell', other: 'irrigOther',
+}
 // Completion now only counts: name, phone, state, district, farmingType
 const COMPLETION_FIELDS: (keyof UserProfile)[] = ['name', 'phone', 'state', 'district', 'farmingType']
 
@@ -65,6 +72,7 @@ function CropFormModal({
 }) {
   const [form, setForm] = useState<CropCreate>(initial)
   const [showAdvanced, setShowAdvanced] = useState(false)
+  const { t } = useAppContext()
 
   const set = (k: keyof CropCreate, v: unknown) => setForm(p => ({ ...p, [k]: v }))
 
@@ -75,7 +83,7 @@ function CropFormModal({
         <div className="flex items-center justify-between p-5 border-b border-gray-100">
           <h2 className="font-bold text-lg text-gray-900 flex items-center gap-2">
             <Sprout size={20} className="text-primary-500" />
-            {initial.crop_name ? 'Edit Crop' : 'Add New Crop'}
+            {initial.crop_name ? t('editCrop') : t('addNewCrop')}
           </h2>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
             <X size={18} />
@@ -85,13 +93,13 @@ function CropFormModal({
         <div className="p-5 space-y-4">
           {/* Crop Name */}
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Crop Name *</label>
+            <label className="block text-xs font-medium text-gray-600 mb-1">{t('cropName')} *</label>
             <select
               className="select-field"
               value={form.crop_name}
               onChange={e => set('crop_name', e.target.value)}
             >
-              <option value="">Select Crop</option>
+              <option value="">{t('selectCrop')}</option>
               {CROP_CATEGORIES.map(cat => (
                 <optgroup key={cat.id} label={`${cat.icon} ${cat.name}`}>
                   {cat.crops.map(crop => <option key={crop} value={crop}>{crop}</option>)}
@@ -104,7 +112,7 @@ function CropFormModal({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">
-                Area <span className="text-gray-400">(acres)</span>
+                {t('areaAcres')}
               </label>
               <div className="relative">
                 <Ruler size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -120,9 +128,9 @@ function CropFormModal({
               </div>
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Soil Type</label>
+              <label className="block text-xs font-medium text-gray-600 mb-1">{t('soilType')}</label>
               <select className="select-field" value={form.soil_type ?? ''} onChange={e => set('soil_type', e.target.value)}>
-                <option value="">Select Soil</option>
+                <option value="">{t('selectSoil')}</option>
                 {SOIL_TYPES.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
@@ -131,7 +139,7 @@ function CropFormModal({
           {/* Season */}
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1.5">
-              <Calendar size={13} className="inline mr-1" />Season
+              <Calendar size={13} className="inline mr-1" />{t('seasonLabel')}
             </label>
             <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
               {SEASON_OPTIONS.map(s => (
@@ -145,7 +153,7 @@ function CropFormModal({
                     }`}
                 >
                   <span className="text-lg">{s.icon}</span>
-                  <span className="leading-tight">{s.label.split(' ')[0]}</span>
+                  <span className="leading-tight">{(t(SEASON_LABEL_KEY[s.value] ?? '') || s.label).split('(')[0].trim()}</span>
                 </button>
               ))}
             </div>
@@ -154,7 +162,7 @@ function CropFormModal({
           {/* Irrigation */}
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1.5">
-              <Droplets size={13} className="inline mr-1" />Irrigation
+              <Droplets size={13} className="inline mr-1" />{t('irrigationLabel')}
             </label>
             <div className="grid grid-cols-3 gap-2">
               {IRRIGATION_OPTIONS.map(ir => (
@@ -167,7 +175,7 @@ function CropFormModal({
                     : 'border-gray-200 hover:border-blue-200 bg-white text-gray-600'
                     }`}
                 >
-                  <span>{ir.icon}</span> {ir.label}
+                  <span>{ir.icon}</span> {t(IRRIG_LABEL_KEY[ir.value] ?? '') || ir.label}
                 </button>
               ))}
             </div>
@@ -180,14 +188,14 @@ function CropFormModal({
             className="flex items-center gap-1 text-xs text-primary-600 font-medium hover:underline"
           >
             {showAdvanced ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-            {showAdvanced ? 'Hide' : 'Show'} advanced details
+            {showAdvanced ? t('hideAdvanced') : t('showAdvanced')}
           </button>
 
           {showAdvanced && (
             <div className="space-y-3 border-t border-gray-100 pt-3">
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">
-                  <Leaf size={13} className="inline mr-1" />Variety / Cultivar
+                  <Leaf size={13} className="inline mr-1" />{t('varietyCultivar')}
                 </label>
                 <input
                   type="text"
@@ -198,7 +206,7 @@ function CropFormModal({
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Notes</label>
+                <label className="block text-xs font-medium text-gray-600 mb-1">{t('notesLabel')}</label>
                 <textarea
                   placeholder="Any additional notes about this crop..."
                   className="input-field resize-none"
@@ -219,8 +227,8 @@ function CropFormModal({
               onChange={e => set('is_primary', e.target.checked)}
             />
             <div>
-              <span className="text-sm font-semibold text-amber-800">Set as Primary Crop</span>
-              <p className="text-xs text-amber-600">Used for AI advice, weather alerts &amp; market prices</p>
+              <span className="text-sm font-semibold text-amber-800">{t('setPrimary')}</span>
+              <p className="text-xs text-amber-600">{t('setPrimaryDesc')}</p>
             </div>
           </label>
         </div>
@@ -236,9 +244,9 @@ function CropFormModal({
             className="btn-primary flex items-center gap-2 flex-1 justify-center"
           >
             {loading ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-            {initial.crop_name ? 'Save Changes' : 'Add Crop'}
+            {initial.crop_name ? t('saveChanges') : t('addCrop')}
           </button>
-          <button onClick={onClose} className="btn-secondary">Cancel</button>
+          <button onClick={onClose} className="btn-secondary">{t('cancel')}</button>
         </div>
       </div>
     </div>
@@ -259,6 +267,7 @@ function CropCard({
 }) {
   const seasonLabel = SEASON_OPTIONS.find(s => s.value === crop.season)
   const irrigationLabel = IRRIGATION_OPTIONS.find(i => i.value === crop.irrigation)
+  const { t } = useAppContext()
 
   return (
     <div className={`relative rounded-2xl border-2 p-4 transition-all ${crop.is_primary
@@ -267,7 +276,7 @@ function CropCard({
       }`}>
       {crop.is_primary && (
         <span className="absolute -top-2.5 left-4 bg-amber-400 text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
-          <Star size={9} fill="white" /> PRIMARY
+          <Star size={9} fill="white" /> {t('primaryBadge')}
         </span>
       )}
 
@@ -311,12 +320,12 @@ function CropCard({
         )}
         {seasonLabel && (
           <span className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 text-xs px-2 py-1 rounded-lg">
-            {seasonLabel.icon} {seasonLabel.label}
+            {seasonLabel.icon} {t(SEASON_LABEL_KEY[crop.season ?? ''] ?? '') || seasonLabel.label}
           </span>
         )}
         {irrigationLabel && (
           <span className="inline-flex items-center gap-1 bg-cyan-50 text-cyan-700 text-xs px-2 py-1 rounded-lg">
-            {irrigationLabel.icon} {irrigationLabel.label}
+            {irrigationLabel.icon} {t(IRRIG_LABEL_KEY[crop.irrigation ?? ''] ?? '') || irrigationLabel.label}
           </span>
         )}
       </div>
@@ -329,7 +338,7 @@ function CropCard({
 
 // ─── Main Profile Page ────────────────────────────────────────────────────────
 export default function Profile() {
-  const { state, setProfile } = useAppContext()
+  const { state, setProfile, t } = useAppContext()
   const existingProfile = state.userProfile
   const authUser = state.authUser
   const navigate = useNavigate()
@@ -526,13 +535,13 @@ export default function Profile() {
       <div className="flex items-start justify-between">
         <div>
           <h1 className="section-title flex items-center gap-2 mb-0">
-            <span>👤</span> Farmer Profile
+            <span>👤</span> {t('farmerProfile')}
           </h1>
           <p className="text-xs text-gray-500 mt-0.5">Personalise your experience — weather, market &amp; AI advice</p>
         </div>
         {existingProfile && !editing && (
           <button onClick={() => setEditing(true)} className="btn-secondary flex items-center gap-2 text-sm">
-            <Edit3 size={15} /> Edit
+            <Edit3 size={15} /> {t('editBtn')}
           </button>
         )}
       </div>
@@ -540,7 +549,7 @@ export default function Profile() {
       {/* Profile Completion */}
       <div className="card">
         <div className="flex items-center justify-between mb-2">
-          <span className="text-sm font-semibold text-gray-700">Profile Completion</span>
+          <span className="text-sm font-semibold text-gray-700">{t('profileCompletion')}</span>
           <span className={`text-sm font-bold ${score >= 75 ? 'text-green-600' : score >= 40 ? 'text-amber-600' : 'text-red-500'}`}>{score}%</span>
         </div>
         <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
@@ -549,11 +558,11 @@ export default function Profile() {
         <div className="flex items-center justify-between mt-1.5">
           {score >= 75 ? (
             <p className="text-xs text-green-600 flex items-center gap-1">
-              <CheckCircle size={12} /> Great! Your profile is fully personalised
+              <CheckCircle size={12} /> {t('profileComplete')}
             </p>
           ) : (
             <p className="text-xs text-gray-500">
-              Fill in your details and add crops to reach 100%
+              {t('profileIncomplete')}
             </p>
           )}
           <p className="text-[10px] text-gray-400">Profile 80% + Crops 20%</p>
@@ -602,7 +611,7 @@ export default function Profile() {
             onClick={handleDelete}
             className="text-xs text-red-400 hover:text-red-600 flex items-center gap-1 transition-colors"
           >
-            <Trash2 size={12} /> Clear profile
+            <Trash2 size={12} /> {t('clearProfile')}
           </button>
         </div>
       )}
@@ -613,12 +622,12 @@ export default function Profile() {
           {/* Personal Info */}
           <section>
             <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-              <User size={15} className="text-primary-500" /> Personal Information
+              <User size={15} className="text-primary-500" /> {t('personalInfo')}
             </h3>
             <div className="space-y-3">
               {authUser?.email && (
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Email Address</label>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">{t('emailAddress')}</label>
                   <div className="relative">
                     <Mail size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
                     <input type="email" value={authUser.email} readOnly className="input-field pl-9 bg-gray-50 text-gray-500 cursor-not-allowed" />
@@ -626,12 +635,12 @@ export default function Profile() {
                 </div>
               )}
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Full Name *</label>
+                <label className="block text-xs font-medium text-gray-600 mb-1">{t('fullNameRequired')}</label>
                 <input type="text" placeholder="e.g. Ramesh Patil" className="input-field" value={form.name}
                   onChange={e => setForm(p => ({ ...p, name: e.target.value }))} />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Phone Number</label>
+                <label className="block text-xs font-medium text-gray-600 mb-1">{t('phoneNumber')}</label>
                 <div className="relative">
                   <Phone size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
                   <input type="tel" placeholder="10-digit mobile number" className="input-field pl-9" value={form.phone}
@@ -644,18 +653,18 @@ export default function Profile() {
           {/* Location */}
           <section>
             <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-              <MapPin size={15} className="text-primary-500" /> Location
+              <MapPin size={15} className="text-primary-500" /> {t('locationSection')}
             </h3>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">State *</label>
+                <label className="block text-xs font-medium text-gray-600 mb-1">{t('stateRequired')}</label>
                 <select className="select-field" value={form.state} onChange={e => setForm(p => ({ ...p, state: e.target.value }))}>
-                  <option value="">Select State</option>
+                  <option value="">{t('selectState')}</option>
                   {MARKET_STATES.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">District</label>
+                <label className="block text-xs font-medium text-gray-600 mb-1">{t('districtField')}</label>
                 <input type="text" placeholder="e.g. Nashik" className="input-field" value={form.district}
                   onChange={e => setForm(p => ({ ...p, district: e.target.value }))} />
               </div>
@@ -665,7 +674,7 @@ export default function Profile() {
           {/* Farming Type */}
           <section>
             <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-              <LayoutGrid size={15} className="text-primary-500" /> Farming Approach
+              <LayoutGrid size={15} className="text-primary-500" /> {t('farmingApproach')}
             </h3>
             <div className="grid grid-cols-3 gap-2">
               {FARMING_TYPE_OPTIONS.map(opt => (
@@ -687,7 +696,7 @@ export default function Profile() {
           {/* Language Selection */}
           <section>
             <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-              <Globe size={15} className="text-primary-500" /> Preferred Language
+              <Globe size={15} className="text-primary-500" /> {t('preferredLanguage')}
             </h3>
             <p className="text-xs text-gray-500 mb-2">
                Used for translations, AI responses &amp; voice.
@@ -698,16 +707,16 @@ export default function Profile() {
           {/* Crops reminder */}
           <div className="bg-green-50 border border-green-100 rounded-xl p-3 flex items-start gap-2 text-xs text-green-800">
             <Sprout size={14} className="shrink-0 mt-0.5" />
-            <span>Add your crops in the <strong>My Crops</strong> section below — each crop can have its own area, season, soil type and irrigation details.</span>
+            <span>Add your crops in the <strong>{t('myCrops')}</strong> section below — each crop can have its own area, season, soil type and irrigation details.</span>
           </div>
 
           {/* Save */}
           <div className="flex gap-3 pt-2">
             <button onClick={handleSave} className="btn-primary flex items-center gap-2">
-              <Save size={16} /> Save Profile
+              <Save size={16} /> {t('saveProfile')}
             </button>
             {existingProfile && (
-              <button onClick={() => setEditing(false)} className="btn-secondary">Cancel</button>
+              <button onClick={() => setEditing(false)} className="btn-secondary">{t('cancel')}</button>
             )}
           </div>
         </div>
@@ -720,7 +729,7 @@ export default function Profile() {
         <div className="flex items-center justify-between">
           <div>
             <h2 className="section-title flex items-center gap-2 mb-0 text-base">
-              <span>🌾</span> My Crops
+              <span>🌾</span> {t('myCrops')}
             </h2>
             <p className="text-xs text-gray-500">Each crop tracks its own area, soil, season &amp; irrigation</p>
           </div>
@@ -728,7 +737,7 @@ export default function Profile() {
             onClick={() => { setEditingCrop(null); setShowCropModal(true) }}
             className="btn-primary flex items-center gap-2 text-sm py-2 px-4"
           >
-            <Plus size={15} /> Add Crop
+            <Plus size={15} /> {t('addCrop')}
           </button>
         </div>
 
@@ -740,13 +749,13 @@ export default function Profile() {
         ) : crops.length === 0 ? (
           <div className="card text-center py-10 border-2 border-dashed border-gray-200">
             <div className="text-4xl mb-3">🌱</div>
-            <p className="font-semibold text-gray-700">No crops added yet</p>
+            <p className="font-semibold text-gray-700">{t('noCrops')}</p>
             <p className="text-xs text-gray-400 mt-1 mb-4">Add the crops you grow to get tailored AI advice</p>
             <button
               onClick={() => { setEditingCrop(null); setShowCropModal(true) }}
               className="btn-primary mx-auto flex items-center gap-2 text-sm"
             >
-              <Plus size={15} /> Add Your First Crop
+              <Plus size={15} /> {t('addCrop')}
             </button>
           </div>
         ) : (
@@ -761,7 +770,7 @@ export default function Profile() {
               />
             ))}
             <p className="text-xs text-gray-400 text-center">
-              {crops.length} crop{crops.length !== 1 ? 's' : ''} · Tap ☆ on any crop to set it as primary
+              {crops.length} {crops.length !== 1 ? t('cropsPlural') : t('cropSingular')} · {t('tapSetPrimary')}
             </p>
           </div>
         )}

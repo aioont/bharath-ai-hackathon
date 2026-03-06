@@ -54,7 +54,7 @@ export default function VerifyEmail() {
     try {
       const res = await verifyEmail(email, codeStr)
       setAuth(res.user, res.access_token)
-      toast.success('Email verified! Welcome to Agri-Translate AI 🌾')
+      toast.success('Email verified! Welcome to AgriSaarthi 🌾')
       navigate('/profile')
     } catch (err: unknown) {
       const msg =
