@@ -85,7 +85,7 @@ User Request → Backend API
 
 2. **Basic Configuration**:
    - **Cache name**: `agri-translate-cache`
-   - **Description**: "Serverless cache for Agri-Translate AI (reduces Bedrock KB costs)"
+   - **Description**: "Serverless cache for Agri AI (reduces Bedrock KB costs)"
    - **Engine**: **Valkey** (recommended - open source, no licensing)
      - Alternative: Redis OSS (also supported)
    - **Engine version**: Latest (7.1+)
@@ -268,7 +268,7 @@ User Request → Backend API
 
 ### Verdict: Use Serverless Valkey! 🏆
 
-For **Agri-Translate AI**:
+For **Agri AI**:
 - ✅ Variable traffic (farmers use during day, idle at night)
 - ✅ Hackathon/startup phase (may scale or pivot)
 - ✅ Cost optimization priority (OpenSearch is expensive!)

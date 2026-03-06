@@ -15,8 +15,8 @@ async def get_market_filters():
 
 @router.get("/prices", response_model=MarketResponse)
 async def market_prices(
-    commodity_id: int = Query(default=3, description="Commodity ID (3=all)"),
-    state_id: int = Query(default=17, description="State ID (17=all states)"),
+    commodity_id: int = Query(default=19, description="Commodity ID"),
+    state_id: int = Query(default=17, description="State ID"),
     from_date: str = Query(default="", description="From date (YYYY-MM-DD)"),
     to_date: str = Query(default="", description="To date (YYYY-MM-DD)"),
     language: str = Query(default="en", description="Response language code"),

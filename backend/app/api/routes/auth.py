@@ -153,7 +153,7 @@ async def _send_verification_email(to_email: str, full_name: str, code: str):
     name = full_name or to_email.split("@")[0]
     html_body = f"""
     <div style="font-family:sans-serif;max-width:480px;margin:auto;padding:32px;background:#f9f9f9;border-radius:12px">
-      <h2 style="color:#166534">🌾 Agri-Translate AI</h2>
+      <h2 style="color:#166534">🌾 AgriSaarthi</h2>
       <p>Hello <strong>{name}</strong>,</p>
       <p>Your email verification code is:</p>
       <div style="font-size:36px;font-weight:bold;letter-spacing:8px;text-align:center;
@@ -172,7 +172,7 @@ async def _send_verification_email(to_email: str, full_name: str, code: str):
                 "Content-Type": "application/json",
             },
             json={
-                "from": "Agri-Translate AI <send@makeasite.in>",
+                "from": "AgriSaarthi <send@makeasite.in>",
                 "to": [to_email],
                 "subject": f"Your verification code: {code}",
                 "html": html_body,

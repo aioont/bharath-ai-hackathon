@@ -5,7 +5,7 @@ import json
 
 class Settings(BaseSettings):
     # App
-    APP_NAME: str = "Agri-Translate AI"
+    APP_NAME: str = "AgriSaarthi"
     APP_VERSION: str = "1.0.0"
     APP_ENV: str = "development"
     DEBUG: bool = True

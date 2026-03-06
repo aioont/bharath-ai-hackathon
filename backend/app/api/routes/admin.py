@@ -4,7 +4,7 @@ Admin routes — cache statistics and management endpoints
 from fastapi import APIRouter
 from app.core.cache import get_cache_stats, invalidate_pattern, is_cache_available
 
-router = APIRouter(prefix="/admin", tags=["admin"])
+router = APIRouter(prefix="/api/admin", tags=["admin"])
 
 
 @router.get("/cache/stats")
@@ -108,3 +108,67 @@ def _get_recommendations(stats: dict) -> list[str]:
         recommendations.append("✅ Cache performance is optimal.")
     
     return recommendations
+import psycopg2
+import psycopg2.extras
+from app.core.config import settings
+from fastapi import HTTPException
+
+def _get_conn():
+    return psycopg2.connect(settings.DATABASE_POOL_URL, connect_timeout=10)
+
+@router.get("/db/tables")
+def get_tables():
+    try:
+        conn = _get_conn()
+        try:
+            cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            cur.execute("""
+                SELECT table_name 
+                FROM information_schema.tables 
+                WHERE table_schema = 'public'
+                ORDER BY table_name
+            """)
+            tables = [row['table_name'] for row in cur.fetchall()]
+            return {"tables": tables}
+        finally:
+            conn.close()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/db/tables/{table_name}")
+def get_table_data(table_name: str, limit: int = 50, offset: int = 0):
+    try:
+        conn = _get_conn()
+        try:
+            cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            cur.execute("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name = %s", (table_name,))
+            if not cur.fetchone():
+                raise HTTPException(status_code=404, detail="Table not found")
+            
+            cur.execute("SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = 'public' AND table_name = %s", (table_name,))
+            columns = cur.fetchall()
+
+            # Exclude large binary columns if any to avoid massive payloads
+            col_names = [c['column_name'] for c in columns if c['data_type'] != 'bytea']
+            if not col_names:
+                col_names = ['*']
+            
+            query = f"SELECT {', '.join(col_names)} FROM public.{table_name} LIMIT %s OFFSET %s"
+            cur.execute(query, (limit, offset))
+            data = cur.fetchall()
+            
+            cur.execute(f"SELECT COUNT(*) as count FROM public.{table_name}")
+            total_count = cur.fetchone()['count']
+
+            return {
+                "table": table_name,
+                "columns": columns,
+                "data": data,
+                "total": total_count,
+                "limit": limit,
+                "offset": offset
+            }
+        finally:
+            conn.close()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

@@ -63,6 +63,7 @@ class ChatRequest(BaseModel):
     message: str = Field(..., min_length=1, max_length=1000)
     language: str = "en"
     conversation_history: Optional[List[ChatMessageModel]] = []
+    conversation_uuid: Optional[str] = None  # For retrieving/continuing conversations
     category: Optional[str] = None
     farmer_profile: Optional[FarmerProfile] = None
     tts_enabled: bool = False  # If True, backend generates TTS audio and returns base64

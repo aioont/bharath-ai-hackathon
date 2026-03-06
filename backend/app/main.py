@@ -34,16 +34,16 @@ log = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    log.info("=== Agri-Translate AI starting (v%s) ===", settings.APP_VERSION)
+    log.info("=== AgriSaarthi starting (v%s) ===", settings.APP_VERSION)
     yield
-    log.info("=== Agri-Translate AI shutting down ===")
+    log.info("=== AgriSaarthi shutting down ===")
 
 
 # ---------------------------------------------------------------------------
 # Application
 # ---------------------------------------------------------------------------
 app = FastAPI(
-    title="Agri-Translate AI",
+    title="AgriSaarthi",
     description=(
         "Multilingual AI platform for Indian farmers — "
         "powered by Amazon Bedrock, Amazon Translate, and Open-Meteo."
@@ -111,7 +111,7 @@ app.include_router(admin.router)  # Cache statistics & management
 @app.get("/", tags=["Meta"])
 async def root():
     return {
-        "app": "Agri-Translate AI",
+        "app": "AgriSaarthi",
         "version": settings.APP_VERSION,
         "status": "running",
         "docs": "/docs",

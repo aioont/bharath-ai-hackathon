@@ -1,4 +1,4 @@
-# Agri-Translate AI Backend 🌾
+# Agri AI Backend 🌾
 
 > **Production-grade FastAPI backend empowering 270M+ Indian farmers**  
 > **Award-Winning Architecture:** AWS Bedrock Knowledge Bases • ElastiCache Serverless • Sarvam AI • Multi-tier Caching
