@@ -40,6 +40,7 @@ def _ensure_users_table():
         email TEXT NOT NULL UNIQUE,
         password_hash TEXT NOT NULL,
         full_name TEXT,
+        phone TEXT,
         is_verified BOOLEAN NOT NULL DEFAULT FALSE,
         verification_code TEXT,
         verification_code_expires_at TIMESTAMPTZ,
@@ -49,6 +50,7 @@ def _ensure_users_table():
         farming_type TEXT,
         language TEXT
     );
+    ALTER TABLE public.users ADD COLUMN IF NOT EXISTS phone TEXT;
     """
     try:
         with _get_conn() as conn:
@@ -93,6 +95,7 @@ class UserOut(BaseModel):
     id: str
     email: str
     full_name: Optional[str]
+    phone: Optional[str] = None
     is_verified: bool
     created_at: str
     state: Optional[str] = None
@@ -102,6 +105,7 @@ class UserOut(BaseModel):
 
 class ProfileUpdate(BaseModel):
     full_name: Optional[str] = None
+    phone: Optional[str] = None
     state: Optional[str] = None
     district: Optional[str] = None
     farming_type: Optional[str] = None
@@ -351,6 +355,11 @@ async def get_me(user_id: str = Depends(require_current_user)):
 
     return UserOut(
         id=str(user["id"]),
+        email=user["email"],
+        full_name=user.get("full_name"),
+        phone=user.get("phone"),
+        is_verified=bool(user.get("is_verified", False)),
+        created_at=user["created_at"].isoformat() if hasattr(user["created_at"], "isoformat") else str(user["created_at"]),
         state=user.get("state"),
         district=user.get("district"),
         farming_type=user.get("farming_type"),
@@ -371,6 +380,9 @@ async def update_profile(body: ProfileUpdate, user_id: str = Depends(require_cur
                 if body.full_name is not None:
                     updates.append("full_name = %s")
                     params.append(body.full_name)
+                if body.phone is not None:
+                    updates.append("phone = %s")
+                    params.append(body.phone or None)  # store empty string as NULL
                 if body.state is not None:
                     updates.append("state = %s")
                     params.append(body.state)
@@ -405,6 +417,7 @@ async def update_profile(body: ProfileUpdate, user_id: str = Depends(require_cur
         id=str(user["id"]),
         email=user["email"],
         full_name=user["full_name"],
+        phone=user.get("phone"),
         is_verified=user["is_verified"],
         created_at=user["created_at"].isoformat() if hasattr(user["created_at"], "isoformat") else str(user["created_at"]),
         state=user.get("state"),

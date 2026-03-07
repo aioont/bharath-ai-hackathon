@@ -322,6 +322,7 @@ export interface AuthUser {
   id: string
   email: string
   full_name?: string
+  phone?: string
   is_verified: boolean
   state?: string
   district?: string
@@ -347,7 +348,16 @@ export const login = (email: string, password: string) =>
 export const getMe = () =>
   api.get<AuthUser>('/api/auth/me').then((r) => r.data)
 
-export const updateProfile = (data: Partial<AuthUser>) =>
+export interface ProfileUpdateRequest {
+  full_name?: string
+  phone?: string
+  state?: string
+  district?: string
+  farming_type?: string
+  language?: string
+}
+
+export const updateProfile = (data: ProfileUpdateRequest) =>
   api.put<AuthUser>('/api/auth/profile', data).then((r) => r.data)
 
 export const resendVerification = (email: string) =>

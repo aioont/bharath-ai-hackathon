@@ -13,6 +13,7 @@ export default function Layout({ children }: LayoutProps) {
   const location = useLocation()
 
   const isAdminRoute = location.pathname.startsWith('/admin')
+  const isAuthRoute = location.pathname === '/' || location.pathname === '/login' || location.pathname === '/register'
 
   // Close sidebar on route change
   useEffect(() => {
@@ -26,7 +27,7 @@ export default function Layout({ children }: LayoutProps) {
 
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar overlay */}
-        {!isAdminRoute && state.sidebarOpen && (
+        {!isAdminRoute && !isAuthRoute && state.sidebarOpen && (
           <div
             className="fixed inset-0 bg-black/40 z-30 lg:hidden"
             onClick={() => dispatch({ type: 'SET_SIDEBAR', payload: false })}
@@ -34,7 +35,7 @@ export default function Layout({ children }: LayoutProps) {
         )}
 
         {/* Sidebar - fixed between top bar and bottom nav, scrolls internally */}
-        {!isAdminRoute && (
+        {!isAdminRoute && !isAuthRoute && (
           <aside
             className={
               `fixed left-0 w-64 z-50 bg-white shadow-xl transform transition-transform duration-300 ease-in-out
@@ -47,7 +48,7 @@ export default function Layout({ children }: LayoutProps) {
         )}
 
         {/* Main content */}
-        <main className={`flex-1 overflow-y-auto ${!isAdminRoute ? 'lg:ml-64' : ''}`}>
+        <main className={`flex-1 overflow-y-auto ${!isAdminRoute && !isAuthRoute ? 'lg:ml-64' : ''}`}>
           {isAdminRoute ? (
             children
           ) : (

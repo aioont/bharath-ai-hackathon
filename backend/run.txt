@@ -7,3 +7,9 @@ python -m uvicorn app.main:app --reload --port 8000 --host 0.0.0.0
 === Get IP ===: 
 (Invoke-WebRequest -Uri "https://api.ipify.org" -UseBasicParsing).Content
 (iwr ifconfig.me/ip).Content
+
+
+
+1. Add a tool that can send questions and collect answers when needed
+2. daily data collector
+3. Schedule events by date when date reached check for market price, reminder to re add fertilizer

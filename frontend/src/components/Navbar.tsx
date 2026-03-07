@@ -3,7 +3,7 @@ import {
   Menu, Globe, Bell, Wifi, WifiOff, LogIn, LogOut, X,
   AlertTriangle, Leaf, RefreshCw, Volume2, VolumeX, Loader2,
 } from 'lucide-react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAppContext } from '@/context/AppContext'
 import { getWeatherForecast, translateText, type WeatherForecast } from '@/services/api'
 import toast from 'react-hot-toast'
@@ -107,6 +107,8 @@ function SpeakerButton({
 export default function Navbar() {
   const { state, dispatch, logout, t } = useAppContext()
   const navigate = useNavigate()
+  const location = useLocation()
+  const isAuthRoute = location.pathname === '/' || location.pathname === '/login' || location.pathname === '/register'
   const authUser = state.authUser
   const userProfile = state.userProfile
   const langCode = state.selectedLanguage.code
@@ -189,13 +191,15 @@ export default function Navbar() {
       <div className="flex items-center justify-between h-16 px-4 max-w-7xl mx-auto">
         {/* Left: Hamburger + Logo */}
         <div className="flex items-center gap-3">
-          <button
-            onClick={() => dispatch({ type: 'TOGGLE_SIDEBAR' })}
-            className="p-2 rounded-xl text-gray-500 hover:bg-primary-50 hover:text-primary-700 transition-colors lg:hidden"
-            aria-label="Toggle menu"
-          >
-            <Menu size={22} />
-          </button>
+          {!isAuthRoute && (
+            <button
+              onClick={() => dispatch({ type: 'TOGGLE_SIDEBAR' })}
+              className="p-2 rounded-xl text-gray-500 hover:bg-primary-50 hover:text-primary-700 transition-colors lg:hidden"
+              aria-label="Toggle menu"
+            >
+              <Menu size={22} />
+            </button>
+          )}
 
           <div className="flex items-center gap-2 ml-8">
             <div className="w-9 h-9 bg-agri-gradient rounded-xl flex items-center justify-center text-lg shadow-md">
@@ -223,12 +227,14 @@ export default function Navbar() {
             {state.isOnline ? 'Connected' : 'Offline'}
           </div>
 
-          {/* Language selector */}
-          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-primary-50 rounded-xl text-sm font-medium text-primary-700 cursor-pointer hover:bg-primary-100 transition-colors">
-            <Globe size={15} />
-            <span className="hidden sm:inline">{state.selectedLanguage.flag} {state.selectedLanguage.englishName}</span>
-            <span className="sm:hidden">{state.selectedLanguage.flag}</span>
-          </div>
+          {/* Language selector — hidden on login/register */}
+          {!isAuthRoute && (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-primary-50 rounded-xl text-sm font-medium text-primary-700 cursor-pointer hover:bg-primary-100 transition-colors">
+              <Globe size={15} />
+              <span className="hidden sm:inline">{state.selectedLanguage.flag} {state.selectedLanguage.englishName}</span>
+              <span className="sm:hidden">{state.selectedLanguage.flag}</span>
+            </div>
+          )}
 
           {/* Auth: Sign In / User Avatar */}
           {authUser ? (
