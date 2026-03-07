@@ -28,6 +28,7 @@ structlog>=24.1
 prometheus-client>=0.19
 mangum>=0.17
 PyYAML>=6.0
+apscheduler>=3.10          # Background alert scheduler (weather + price agent)
 mem0ai>=0.1.31
 deepeval>=1.4.0
 duckduckgo-search>=4.1.0

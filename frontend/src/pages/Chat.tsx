@@ -1,6 +1,43 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { Send, Sparkles, Volume2, VolumeX, Trash2 } from 'lucide-react'
 import { sendChatMessage, getCrops, getChatHistory, clearChatHistory } from '@/services/api'
+
+// ── Chat History Cache (localStorage, 24-hour TTL) ──────────────────────────
+const CHAT_CACHE_KEY = 'agri_chat_history_cache'
+const CHAT_CACHE_TTL = 24 * 60 * 60 * 1000 // 24 hours in ms
+
+interface ChatHistoryCache {
+  timestamp: number
+  messages: Array<{ role: 'user' | 'assistant'; content: string; timestamp?: string; isError?: boolean }>
+}
+
+function getCachedHistory(): ChatHistoryCache | null {
+  try {
+    const raw = localStorage.getItem(CHAT_CACHE_KEY)
+    if (!raw) return null
+    const cache: ChatHistoryCache = JSON.parse(raw)
+    if (Date.now() - cache.timestamp > CHAT_CACHE_TTL) {
+      localStorage.removeItem(CHAT_CACHE_KEY)
+      return null
+    }
+    return cache
+  } catch {
+    return null
+  }
+}
+
+function setCachedHistory(messages: ChatHistoryCache['messages']) {
+  try {
+    const cache: ChatHistoryCache = { timestamp: Date.now(), messages }
+    localStorage.setItem(CHAT_CACHE_KEY, JSON.stringify(cache))
+  } catch {
+    // quota exceeded or other error — silently skip
+  }
+}
+
+function clearCachedHistory() {
+  localStorage.removeItem(CHAT_CACHE_KEY)
+}
 import type { ChatMessage, FarmerCrop } from '@/services/api'
 import ChatMessageBubble, { TypingIndicator } from '@/components/ChatMessage'
 import VoiceButton from '@/components/VoiceButton'
@@ -63,22 +100,31 @@ export default function Chat() {
   const [crops, setCrops] = useState<FarmerCrop[]>([])
   const [loadingHistory, setLoadingHistory] = useState(false)
   
-  // Load chat history on mount
+  // Load chat history on mount (cache-first, 24-hour TTL)
   const loadChatHistory = async () => {
     if (!state.authUser) return
-    
+
+    // 1. Try cache first
+    const cached = getCachedHistory()
+    if (cached && cached.messages.length > 0) {
+      setMessages(cached.messages as ChatMessageExt[])
+      return // skip network request
+    }
+
+    // 2. Cache miss — fetch from API
     try {
       setLoadingHistory(true)
       const { messages: historyMsgs } = await getChatHistory(false)
-      
+
       if (historyMsgs && historyMsgs.length > 0) {
         const convertedMessages: ChatMessageExt[] = historyMsgs.map(msg => ({
           role: msg.role as 'user' | 'assistant',
           content: msg.content,
           timestamp: msg.created_at,
         }))
-        
+
         setMessages(convertedMessages)
+        setCachedHistory(convertedMessages) // populate cache
         toast.success(`Loaded ${historyMsgs.length} messages from history`, { duration: 2000 })
       }
     } catch (error) {
@@ -93,19 +139,22 @@ export default function Chat() {
     if (!confirm('Are you sure you want to clear all chat history? This cannot be undone.')) {
       return
     }
-    
+
     try {
       await clearChatHistory()
-      
+      clearCachedHistory() // also clear the local cache
+
       // Reset to welcome message
-      setMessages([{
+      const welcome: ChatMessageExt = {
         role: 'assistant',
         content: profile?.name
           ? `Namaste ${profile.name}! 🌾 ${TOPIC_WELCOME[selectedTopic]}`
           : TOPIC_WELCOME[selectedTopic],
         timestamp: new Date().toISOString(),
-      }])
-      
+      }
+      setMessages([welcome])
+      setCachedHistory([welcome])
+
       toast.success('Chat history cleared successfully')
     } catch (error) {
       toast.error('Failed to clear chat history')
@@ -151,6 +200,8 @@ export default function Chat() {
   const bottomRef = useRef<HTMLDivElement>(null)
   const chatRef = useRef<HTMLDivElement>(null)
   const mountedRef = useRef(true)
+  // Blocks late-firing recognition callbacks from re-filling the input after send
+  const isSubmittingRef = useRef(false)
 
   useEffect(() => {
     mountedRef.current = true
@@ -199,8 +250,13 @@ export default function Chat() {
     setAutoSpeak((prev) => !prev)
   }, [])
 
-  // ── Voice input transcript handler ───────────────────────────────────────
-  const handleVoiceTranscript = (text: string) => setInput(text)
+  // ── Voice input handlers ─────────────────────────────────────────────────
+  // Called when mic activates: wipe any existing text so voice starts clean
+  const handleVoiceStart = () => { isSubmittingRef.current = false; setInput('') }
+  // Streams partial recognised text live into the textarea as the user speaks
+  const handleInterimTranscript = (text: string) => { if (!isSubmittingRef.current) setInput(text) }
+  // Final committed transcript
+  const handleVoiceTranscript = (text: string) => { if (!isSubmittingRef.current) setInput(text) }
 
   // ── Language detected from voice input ──────────────────────────────────
   const handleDetectedLanguage = useCallback((langCode: string) => {
@@ -222,6 +278,12 @@ export default function Chat() {
     const msg = (text ?? input).trim()
     if (!msg || loading) return
 
+    // Clear input and block any late recognition callbacks from re-filling it
+    isSubmittingRef.current = true
+    setInput('')
+    // Stop mic if it's still listening (continuous mode)
+    if (isListening) setIsListening(false)
+
     window.speechSynthesis.cancel()
 
     const userMessage: ChatMessageExt = {
@@ -231,7 +293,6 @@ export default function Chat() {
     }
 
     setMessages((prev) => [...prev, userMessage])
-    setInput('')
     setLoading(true)
 
     try {
@@ -269,7 +330,12 @@ export default function Chat() {
         audioBase64: result.audio_base64 ?? undefined,
         audioFormat: result.audio_format ?? 'wav',
       }
-      setMessages((prev) => [...prev, aiMessage])
+      setMessages((prev) => {
+        const updated = [...prev, aiMessage]
+        // Update cache with latest messages (strip audio blobs to keep storage lean)
+        setCachedHistory(updated.map(({ audioBase64: _a, audioFormat: _f, ...rest }) => rest))
+        return updated
+      })
     } catch (err: unknown) {
       if (!mountedRef.current) return
 
@@ -293,7 +359,10 @@ export default function Chat() {
         toast.error(detail, { duration: 5000 })
       }
     } finally {
-      if (mountedRef.current) setLoading(false)
+      if (mountedRef.current) {
+        setLoading(false)
+        isSubmittingRef.current = false
+      }
     }
   }
 
@@ -302,7 +371,7 @@ export default function Chat() {
       className="flex flex-col animate-fade-in"
       style={{
         zoom: 0.9,
-        height: 'calc(100vh - 8rem)',
+        height: 'calc(100vh - 3rem)',
       }}
     >
       {/* Header & Topic Selector */}
@@ -447,6 +516,8 @@ export default function Chat() {
         <div className="flex-shrink-0 flex gap-1.5 mt-2 items-end">
         <VoiceButton
           onTranscript={handleVoiceTranscript}
+          onInterimTranscript={handleInterimTranscript}
+          onStart={handleVoiceStart}
           onDetectedLanguage={handleDetectedLanguage}
           isListening={isListening}
           setIsListening={setIsListening}

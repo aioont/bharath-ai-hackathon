@@ -10,13 +10,13 @@ from fastapi.responses import JSONResponse
 
 from app.core.config import settings
 from app.api.routes import translate, chat, crop_health, weather, market, forum, news, auth, crops
-from app.api.routes import plan, market_analyzer, mock_iot, evaluation, insurance, admin
+from app.api.routes import plan, market_analyzer, mock_iot, evaluation, insurance, admin, alerts
 
 # ---------------------------------------------------------------------------
 # Logging — configure stdlib logging so every logger in every route works
 # ---------------------------------------------------------------------------
 logging.basicConfig(
-    level=logging.DEBUG if settings.DEBUG else logging.INFO,
+    level=logging.INFO if settings.DEBUG else logging.INFO,
     format="%(asctime)s  %(levelname)-8s  %(name)s  %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
 )
@@ -25,6 +25,30 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
 logging.getLogger("psycopg2").setLevel(logging.WARNING)
 logging.getLogger("urllib3").setLevel(logging.WARNING)
+logging.getLogger("primp").setLevel(logging.WARNING)
+logging.getLogger("primp.connect").setLevel(logging.WARNING)
+logging.getLogger("hyper_util").setLevel(logging.WARNING)
+logging.getLogger("hyper_util.client.legacy.connect").setLevel(logging.WARNING)
+logging.getLogger("hyper_util.client.legacy.connect.http").setLevel(logging.WARNING)
+logging.getLogger("cookie_store").setLevel(logging.WARNING)
+
+# ---------------------------------------------------------------------------
+# Structlog — bind to stdlib logging so structlog events respect the same
+# INFO/DEBUG level set above.  Without this, structlog uses its own defaults.
+# ---------------------------------------------------------------------------
+import structlog
+_log_level = logging.INFO if settings.DEBUG else logging.INFO
+structlog.configure(
+    wrapper_class=structlog.make_filtering_bound_logger(_log_level),
+    processors=[
+        structlog.stdlib.add_log_level,
+        # add_logger_name requires a stdlib LoggerFactory (.name attribute);
+        # PrintLogger has no .name — removed to avoid AttributeError.
+        structlog.processors.TimeStamper(fmt="%Y-%m-%d %H:%M:%S"),
+        structlog.dev.ConsoleRenderer(),
+    ],
+    logger_factory=structlog.PrintLoggerFactory(),
+)
 
 log = logging.getLogger(__name__)
 
@@ -35,7 +59,46 @@ log = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     log.info("=== AgriSaarthi starting (v%s) ===", settings.APP_VERSION)
+
+    # ── Autonomous Alert Agent (APScheduler) ─────────────────────────────────
+    try:
+        from apscheduler.schedulers.asyncio import AsyncIOScheduler
+        from app.services.alert_service import run_weather_alert_scan, run_price_alert_scan
+
+        scheduler = AsyncIOScheduler(timezone="Asia/Kolkata")
+        # Weather scan every 6 hours
+        scheduler.add_job(
+            run_weather_alert_scan,
+            trigger="interval",
+            hours=6,
+            id="weather_alert_scan",
+            max_instances=1,
+            misfire_grace_time=300,
+        )
+        # Price scan every 2 hours
+        scheduler.add_job(
+            run_price_alert_scan,
+            trigger="interval",
+            hours=2,
+            id="price_alert_scan",
+            max_instances=1,
+            misfire_grace_time=300,
+        )
+        scheduler.start()
+        log.info("alert_scheduler_started jobs=weather(6h),price(2h)")
+    except ImportError:
+        log.warning("apscheduler not installed — alert scheduler disabled. "
+                    "Run: pip install apscheduler")
+        scheduler = None
+    except Exception as exc:
+        log.error("alert_scheduler_start_failed: %s", exc)
+        scheduler = None
+
     yield
+
+    if scheduler and scheduler.running:
+        scheduler.shutdown(wait=False)
+        log.info("alert_scheduler_stopped")
     log.info("=== AgriSaarthi shutting down ===")
 
 
@@ -103,6 +166,7 @@ app.include_router(mock_iot.router)
 app.include_router(evaluation.router)
 app.include_router(insurance.router)
 app.include_router(admin.router)  # Cache statistics & management
+app.include_router(alerts.router) # Autonomous alert preferences & triggers
 
 
 # ---------------------------------------------------------------------------

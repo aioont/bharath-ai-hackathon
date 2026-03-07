@@ -436,6 +436,9 @@ export default function Profile() {
 
   const handleSave = async () => {
     if (!form.name.trim()) { toast.error('Please enter your name'); return }
+    if (form.phone.trim() && !/^[0-9]{10}$/.test(form.phone.trim())) {
+      toast.error('Phone number must be exactly 10 digits'); return
+    }
     if (!form.state) { toast.error('Please select your state'); return }
     
     try {
@@ -643,8 +646,17 @@ export default function Profile() {
                 <label className="block text-xs font-medium text-gray-600 mb-1">{t('phoneNumber')}</label>
                 <div className="relative">
                   <Phone size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
-                  <input type="tel" placeholder="10-digit mobile number" className="input-field pl-9" value={form.phone}
-                    onChange={e => setForm(p => ({ ...p, phone: e.target.value }))} />
+                  <input
+                    type="tel"
+                    placeholder="10-digit mobile number"
+                    className={`input-field pl-9 ${form.phone.trim() && !/^[0-9]{10}$/.test(form.phone.trim()) ? 'border-red-400 focus:border-red-500' : ''}`}
+                    value={form.phone}
+                    maxLength={10}
+                    onChange={e => {
+                      const val = e.target.value.replace(/\D/g, '').slice(0, 10)
+                      setForm(p => ({ ...p, phone: val }))
+                    }}
+                  />
                 </div>
               </div>
             </div>

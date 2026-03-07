@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     APP_NAME: str = "AgriSaarthi"
     APP_VERSION: str = "1.0.0"
     APP_ENV: str = "development"
-    DEBUG: bool = True
+    DEBUG: bool = False
 
     # Sarvam AI (primary AI + translation)
     SARVAM_API_KEY: str = ""
@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     BEDROCK_CLAUDE_MODEL_ID: str = "anthropic.claude-3-haiku-20240307-v1:0"
     BEDROCK_GUARDRAIL_ID: str = ""
     BEDROCK_GUARDRAIL_VERSION: str = "DRAFT"
-    
+
     # Bedrock Knowledge Bases
     BEDROCK_INSURANCE_KB_ID: str = ""  # Insurance schemes KB
     BEDROCK_AGRI_KB_ID: str = ""       # Agriculture knowledge KB (farming, crops, pests)

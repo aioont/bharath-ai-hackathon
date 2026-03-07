@@ -99,7 +99,11 @@ def _get_sarvam_client():
 def _tool_search_web(query: str) -> str:
     """Perform a real web search using DuckDuckGo."""
     try:
-        from duckduckgo_search import DDGS
+        # Package was renamed from duckduckgo_search → ddgs
+        try:
+            from ddgs import DDGS  # type: ignore  (new package name)
+        except ImportError:
+            from duckduckgo_search import DDGS  # type: ignore  (old package name)
         with DDGS() as ddgs:
             results = list(ddgs.text(query, max_results=3))
             if not results:
@@ -107,63 +111,180 @@ def _tool_search_web(query: str) -> str:
             summary = "\n".join([f"- {r['title']}: {r['body']}" for r in results])
             return f"Search Results for '{query}':\n{summary}"
     except ImportError:
-        return "Search tool unavailable (duckduckgo_search not installed)."
+        return "Search tool unavailable (install ddgs: pip install ddgs)."
     except Exception as e:
         logger.error("search_tool_error", error=str(e))
         return f"Search failed: {str(e)}"
 
-def _tool_get_weather(location: str) -> str:
-    """Get weather data by searching online."""
-    return _tool_search_web(f"current weather in {location} forecast moisture humidity")
+async def _tool_get_weather(location: str) -> str:
+    """Get real weather data using the Open-Meteo-backed weather service."""
+    try:
+        from app.services.weather_service import get_weather_forecast
+        data = await get_weather_forecast(location, language="en", days=5)
+        current = data.get("current", {})
+        forecast = data.get("forecast", [])[:4]
+        loc = data.get("location", location)
 
-def _tool_market_prices(commodity: str, location: str) -> str:
-    """Get market prices by searching online."""
-    return _tool_search_web(f"current market price (mandi bhav) of {commodity} in {location} today")
+        lines = [
+            f"Weather for {loc}:",
+            f"Today: {current.get('condition','')}, "
+            f"temp {current['temperature']['min']}–{current['temperature']['max']}°C, "
+            f"humidity {current.get('humidity', '?')}%, "
+            f"rain {current.get('rainfall', 0)} mm, "
+            f"wind {current.get('wind_speed', 0)} km/h",
+            f"Farming advice: {current.get('farming_advice', '')}",
+        ]
+        if forecast:
+            lines.append("Next days:")
+            for d in forecast:
+                lines.append(
+                    f"  {d['date']}: {d['condition']}, "
+                    f"{d['temperature']['min']}–{d['temperature']['max']}°C, "
+                    f"rain {d.get('rainfall', 0)} mm"
+                )
+        alerts = current.get("alerts", [])
+        if alerts:
+            for a in alerts:
+                lines.append(f"ALERT ({a.get('severity','').upper()}): {a.get('message','')}")
+        insights = data.get("agricultural_insights", [])
+        if insights:
+            lines.append("Insights: " + " | ".join(insights[:2]))
+
+        logger.info("weather_tool_success", location=loc, condition=current.get("condition"))
+        return "\n".join(lines)
+    except Exception as e:
+        logger.error("weather_tool_error", error=str(e), location=location)
+        # Graceful fallback to web search
+        return _tool_search_web(f"current weather {location} India today forecast")
+
+async def _tool_market_prices(commodity: str, location: str) -> str:
+    """Get live mandi prices from AGMARKNET API, with web search fallback."""
+    from app.services.agmarknet_filters_service import load_agmarknet_filters
+    from app.services.market_service import _fetch_from_agmarknet
+
+    try:
+        filters = load_agmarknet_filters()
+        d = filters.get("data", {})
+
+        # Resolve commodity ID by fuzzy name match
+        commodity_id = None
+        commodity_name = commodity
+        for c in d.get("cmdt_data", []):
+            cname = c.get("cmdt_name", "").lower()
+            if commodity.lower() in cname or cname in commodity.lower():
+                commodity_id = c["cmdt_id"]
+                commodity_name = c["cmdt_name"]
+                break
+
+        # Resolve state ID (100000 = All States)
+        state_id = 100000
+        state_name = location
+        for s in d.get("state_data", []):
+            sname = s.get("state_name", "").lower()
+            if location.lower() in sname or sname in location.lower():
+                state_id = s["state_id"]
+                state_name = s["state_name"]
+                break
+
+        if commodity_id:
+            records = await _fetch_from_agmarknet(
+                commodity_id=commodity_id,
+                state_id=state_id,
+            )
+            if records:
+                date = records[0].get("date", "today")
+                lines = [
+                    f"Live AGMARKNET mandi prices for {commodity_name} in {state_name} (as of {date}):"
+                ]
+                for r in records[:10]:
+                    lines.append(
+                        f"  {r['market']}, {r.get('state','')}: "
+                        f"\u20b9{r['modal_price']}/Quintal "
+                        f"(min \u20b9{r['min_price']}, max \u20b9{r['max_price']})"
+                        + (f" — {r['variety']}" if r.get('variety') and r['variety'] != 'General' else "")
+                    )
+                if len(records) > 10:
+                    lines.append(f"  ... and {len(records)-10} more markets.")
+                logger.info("market_tool_agmarknet_success",
+                            commodity=commodity_name, state=state_name, records=len(records))
+                return "\n".join(lines)
+            else:
+                logger.info("market_tool_agmarknet_empty",
+                            commodity=commodity, state=state_name,
+                            note="No data today, falling back to web search")
+        else:
+            logger.info("market_tool_commodity_not_found", commodity=commodity)
+
+    except Exception as e:
+        logger.warning("market_tool_agmarknet_error", error=str(e),
+                       commodity=commodity, location=location)
+
+    # Fallback to targeted web search
+    return _tool_search_web(
+        f"current mandi price {commodity} {location} today site:agmarknet.gov.in "
+        f"OR site:mandibhav.com OR site:kisan.gov.in"
+    )
 
 async def _tool_agriculture_knowledge(query: str) -> str:
     """Query agriculture knowledge base for farming information, crop cultivation, pest management, etc."""
     from app.core.config import settings
     from app.core.aws_client import get_bedrock_client
     from app.core.cache import get_cached_bedrock_kb_query, cache_bedrock_kb_query
-    
+
     # Check if agriculture KB is configured
     if not settings.BEDROCK_AGRI_KB_ID:
         logger.warning("agri_kb_not_configured", query=query)
-        # Fallback to web search
         return _tool_search_web(f"agriculture farming {query}")
-    
-    # Check cache first (MAJOR COST SAVINGS - OpenSearch is expensive!)
+
+    # Check cache first (saves OpenSearch cost)
     cached_result = await get_cached_bedrock_kb_query(query, settings.BEDROCK_AGRI_KB_ID)
     if cached_result:
         logger.info("agri_kb_cache_hit", query=query[:50])
         return cached_result
-    
+
+    bedrock = get_bedrock_client()
+
+    # --- Strategy 1: RetrieveAndGenerate (full RAG with Claude Haiku) ---
     try:
-        bedrock = get_bedrock_client()
         response = await asyncio.to_thread(
             bedrock.retrieve_and_generate,
             query=query,
             kb_id=settings.BEDROCK_AGRI_KB_ID,
             max_results=5
         )
-        
-        # Extract generated text from response
         output_text = response.get("output", {}).get("text", "")
-        
-        if not output_text:
-            logger.warning("agri_kb_empty_response", query=query)
-            return f"No relevant farming information found for: {query}"
-        
-        # Cache the result (semantic + exact match)
-        await cache_bedrock_kb_query(query, settings.BEDROCK_AGRI_KB_ID, output_text)
-        
-        logger.info("agri_kb_success", query=query, response_length=len(output_text), cached=True)
-        return output_text
-        
+        if output_text:
+            await cache_bedrock_kb_query(query, settings.BEDROCK_AGRI_KB_ID, output_text)
+            logger.info("agri_kb_rag_success", query=query[:50], length=len(output_text))
+            return output_text
+        logger.warning("agri_kb_rag_empty", query=query)
     except Exception as e:
-        logger.error("agri_kb_error", error=str(e), query=query)
-        # Fallback to web search on error
-        return _tool_search_web(f"agriculture farming {query}")
+        logger.warning("agri_kb_rag_failed", error=str(e), query=query[:50],
+                       hint="Falling back to retrieve_only")
+
+    # --- Strategy 2: Retrieve-only (chunks without generation — always works) ---
+    try:
+        chunks = await asyncio.to_thread(
+            bedrock.retrieve_only,
+            query=query,
+            kb_id=settings.BEDROCK_AGRI_KB_ID,
+            max_results=5
+        )
+        if chunks:
+            passages = "\n\n".join(
+                f"[Source {i+1}] {c['text']}" for i, c in enumerate(chunks)
+            )
+            result = f"Relevant agriculture knowledge for '{query}':\n\n{passages}"
+            await cache_bedrock_kb_query(query, settings.BEDROCK_AGRI_KB_ID, result)
+            logger.info("agri_kb_retrieve_only_success", query=query[:50], chunks=len(chunks))
+            return result
+        logger.warning("agri_kb_retrieve_only_empty", query=query)
+    except Exception as e:
+        logger.error("agri_kb_retrieve_only_failed", error=str(e), query=query[:50])
+
+    # --- Strategy 3: Web search fallback ---
+    logger.info("agri_kb_web_search_fallback", query=query[:50])
+    return _tool_search_web(f"agriculture farming {query}")
 
 AVAILABLE_TOOLS = {
     "SEARCH": _tool_search_web,
@@ -192,16 +313,19 @@ async def _agent_loop(messages: list, system_prompt: str, tools_enabled: bool = 
         "\n\nYou have access to these tools to answer questions accurately:\n"
         "- SEARCH: General knowledge, news, government schemes (web search).\n"
         "- WEATHER: Current weather and forecasts.\n"
-        "- MARKET: Mandi prices and market trends.\n"
+        "- MARKET: Mandi prices and market trends. ALWAYS use this for ANY price/rate/mandi question.\n"
         "- KNOWLEDGE: Agriculture knowledge base - use for farming practices, crop cultivation, "
         "pest management, soil health, fertilizer recommendations, etc.\n\n"
         "To use a tool, your response must be valid JSON strictly in this format:\n"
         '{"tool": "SEARCH", "query": "your search query"}\n'
         '{"tool": "WEATHER", "location": "city name"}\n'
-        '{"tool": "MARKET", "commodity": "crop name", "location": "city/state"}\n'
+        '{"tool": "MARKET", "commodity": "crop name", "location": "state name"}\n'
         '{"tool": "KNOWLEDGE", "query": "farming question"}\n\n'
-        "IMPORTANT: Use KNOWLEDGE tool for farming/agriculture questions. Use SEARCH for other topics.\n"
-        "If no tool is needed, just respond with your expert advice in the user's language."
+        "CRITICAL RULES:\n"
+        "- NEVER answer price/rate/mandi questions from your training data — always call MARKET tool first.\n"
+        "- For location, use the STATE name (e.g. Kerala, Maharashtra) not a city.\n"
+        "- Use KNOWLEDGE tool for farming/crop cultivation questions.\n"
+        "- If no tool is needed, just respond with your expert advice in the user's language."
     )
     
     agent_system = system_prompt + tool_instructions
@@ -230,9 +354,11 @@ async def _agent_loop(messages: list, system_prompt: str, tools_enabled: bool = 
                         if tool_name == "SEARCH":
                             tool_result = await asyncio.to_thread(_tool_search_web, tool_call.get("query", ""))
                         elif tool_name == "WEATHER":
-                            tool_result = await asyncio.to_thread(_tool_get_weather, tool_call.get("location", ""))
+                            # _tool_get_weather is async — await directly (no thread needed)
+                            tool_result = await _tool_get_weather(tool_call.get("location", ""))
                         elif tool_name == "MARKET":
-                            tool_result = await asyncio.to_thread(_tool_market_prices, tool_call.get("commodity", ""), tool_call.get("location", ""))
+                            # _tool_market_prices is async — await directly
+                            tool_result = await _tool_market_prices(tool_call.get("commodity", ""), tool_call.get("location", ""))
                         elif tool_name == "KNOWLEDGE":
                             tool_result = await _tool_agriculture_knowledge(tool_call.get("query", ""))
                         else:
@@ -390,24 +516,36 @@ async def get_ai_response(
 
     messages: list = []
     if conversation_history:
-        # Sarvam requires messages to start with a user turn.
-        # Re-interleave history keeping only user→assistant pairs (skips leading assistant welcome).
-        cleaned: list = []
-        last_role = None
+        # Sarvam requires messages to start with a user turn and strictly alternate.
+        # Build a clean alternating list from the last 10 history entries.
+        raw: list = []
         for m in conversation_history[-10:]:
-            # Normalize roles
             role = m.role if m.role in ["user", "assistant"] else "user"
-            
-            if role == "user":
-                cleaned.append({"role": "user", "content": m.content})
-                last_role = "user"
-            elif role == "assistant" and last_role == "user":
-                cleaned.append({"role": "assistant", "content": m.content})
-                last_role = "assistant"
+            raw.append({"role": role, "content": m.content})
+
+        # Enforce strict alternation: drop leading assistant messages, then for
+        # any consecutive same-role pair keep only the most-recent one.
+        cleaned: list = []
+        for entry in raw:
+            if not cleaned:
+                if entry["role"] != "user":
+                    # Skip leading non-user messages
+                    continue
+                cleaned.append(entry)
+            elif entry["role"] == cleaned[-1]["role"]:
+                # Consecutive same role — replace previous with the newer one
+                cleaned[-1] = entry
+            else:
+                cleaned.append(entry)
         messages = cleaned
-    
-    # Ensure we don't duplicate the last user message if frontend sent it in history
-    if not messages or (messages and messages[-1]["role"] == "assistant"):
+
+    # Append the current user message.
+    # If the cleaned history is empty or ends with assistant, add it normally.
+    # If history ends with user (shouldn't normally happen), replace to avoid duplicate.
+    if messages and messages[-1]["role"] == "user":
+        # Replace the trailing user entry (e.g. duplicate from frontend slice)
+        messages[-1] = {"role": "user", "content": message}
+    else:
         messages.append({"role": "user", "content": message})
 
     try:

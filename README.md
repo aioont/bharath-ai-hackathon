@@ -602,3 +602,22 @@ project_to_win_hackathon/
 *"Technology should speak the farmer's language, not the other way around."*
 
 </div>
+
+
+
+
+Added new feature 
+
+
+APScheduler (in-process, starts with uvicorn)
+  ├── every 6 h → run_weather_alert_scan()
+  └── every 2 h → run_price_alert_scan()
+
+
+Agriculture KB (XPS3ZHO4BB) ✅
+
+retrieve_only works — returns 5 chunks
+RetrieveAndGenerate skipped — Claude Haiku billing not activated on your AWS account (403). The fallback passes raw chunks to Sarvam-M for synthesis instead, which works fine.
+Insurance KB (PSTRF0TREZ) ✅
+
+Returns precise scheme data (PMFBY, Pashu Bima, Weather Crop Insurance) with relevance scores

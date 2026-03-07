@@ -46,14 +46,15 @@ class BedrockClient:
         ak = settings.AWS_ACCESS_KEY_ID or None
         sk = settings.AWS_SECRET_ACCESS_KEY or None
         
-        # Runtime for InvokeModel and ApplyGuardrail
+        # Runtime for InvokeModel (Claude, etc.) — also used for guardrails (same region)
         self.runtime_client = boto3.client(
             service_name="bedrock-runtime",
             region_name=settings.AWS_REGION,
             aws_access_key_id=ak,
             aws_secret_access_key=sk,
         )
-        
+        self.guardrail_client = self.runtime_client
+
         # Agent Runtime for Knowledge Bases (RetrieveAndGenerate)
         self.agent_runtime_client = boto3.client(
             service_name="bedrock-agent-runtime",
@@ -61,6 +62,8 @@ class BedrockClient:
             aws_access_key_id=ak,
             aws_secret_access_key=sk,
         )
+        # Circuit-breaker counter for apply_guardrail
+        self._guardrail_failures: int = 0
 
     def invoke_haiku(self, prompt: str, max_tokens: int = 1000, temperature: float = 0.5) -> str:
         """Invoke Claude 3 Haiku model on Bedrock."""
@@ -107,30 +110,53 @@ class BedrockClient:
         Apply Bedrock Guardrail to content.
         source: 'INPUT' (user query) or 'OUTPUT' (model response)
         Returns dict with 'action': 'GUARDRAIL_INTERVENED' | 'NONE'
+
+        Circuit-breaker: after 3 consecutive failures the guardrail is
+        bypassed for the rest of the process lifetime to stop log spam.
         """
         if not settings.BEDROCK_GUARDRAIL_ID:
-             return {"action": "NONE"}
+            return {"action": "NONE"}
+
+        # Circuit-breaker: skip if already tripped
+        if self._guardrail_failures >= 3:
+            return {"action": "NONE"}
 
         try:
-            response = self.runtime_client.apply_guardrail(
+            response = self.guardrail_client.apply_guardrail(
                 guardrailIdentifier=settings.BEDROCK_GUARDRAIL_ID,
                 guardrailVersion=settings.BEDROCK_GUARDRAIL_VERSION,
                 source=source,
                 content=[{"text": {"text": content}}]
             )
-            
+            self._guardrail_failures = 0   # reset on success
             return {
                 "action": response["action"],
                 "outputs": response["outputs"]
             }
         except Exception as e:
-            logger.error("bedrock_guardrail_error", error=str(e))
-            # Fail open if guardrail fails, to avoid blocking valid traffic on config error
+            self._guardrail_failures += 1
+            if self._guardrail_failures == 1:
+                logger.warning(
+                    "bedrock_guardrail_error",
+                    error=str(e),
+                    region=settings.AWS_REGION,
+                    guardrail_id=settings.BEDROCK_GUARDRAIL_ID,
+                )
+            elif self._guardrail_failures == 3:
+                logger.warning(
+                    "bedrock_guardrail_circuit_open",
+                    msg="Guardrail failed 3 times — bypassing for this session. Restart after fixing BEDROCK_GUARDRAIL_ID."
+                )
+            # Fail open — never block real traffic
             return {"action": "NONE", "error": str(e)}
 
     def retrieve_and_generate(self, query: str, kb_id: str, max_results: int = 5):
-        """Standard RAG query against Bedrock KB."""
-        model_arn = f"arn:aws:bedrock:{settings.AWS_REGION}::foundation-model/amazon.titan-text-express-v1"
+        """Standard RAG query against Bedrock KB using Claude Haiku as the generation model."""
+        # Use Claude 3 Haiku — Titan Text Express is not available in ap-south-1
+        model_arn = (
+            f"arn:aws:bedrock:{settings.AWS_REGION}::foundation-model/"
+            f"{settings.BEDROCK_CLAUDE_MODEL_ID}"
+        )
         return self.agent_runtime_client.retrieve_and_generate(
             input={"text": query},
             retrieveAndGenerateConfiguration={
@@ -144,6 +170,27 @@ class BedrockClient:
                 },
             },
         )
+
+    def retrieve_only(self, query: str, kb_id: str, max_results: int = 5) -> list:
+        """
+        Retrieve chunks from Bedrock KB without generation (cheaper, faster).
+        Returns list of text passages with source info.
+        """
+        response = self.agent_runtime_client.retrieve(
+            knowledgeBaseId=kb_id,
+            retrievalQuery={"text": query},
+            retrievalConfiguration={
+                "vectorSearchConfiguration": {"numberOfResults": max_results}
+            },
+        )
+        results = []
+        for item in response.get("retrievalResults", []):
+            content = item.get("content", {}).get("text", "")
+            score = item.get("score", 0)
+            source = item.get("location", {}).get("s3Location", {}).get("uri", "")
+            if content:
+                results.append({"text": content, "score": score, "source": source})
+        return results
 
 
 _bedrock_instance = None

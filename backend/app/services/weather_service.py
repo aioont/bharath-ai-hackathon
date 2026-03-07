@@ -136,6 +136,7 @@ async def _geocode_location(location: str) -> tuple[float, float]:
 
 async def _fetch_weather_data(lat: float, lon: float, location: str, language: str, days: int = 7) -> dict:
     """Fetch from Open-Meteo API."""
+    logger.info("weather_api_fetch", location=location, lat=round(lat, 2), lon=round(lon, 2), days=days)
     async with httpx.AsyncClient(timeout=10.0) as client:
         resp = await client.get(
             "https://api.open-meteo.com/v1/forecast",
