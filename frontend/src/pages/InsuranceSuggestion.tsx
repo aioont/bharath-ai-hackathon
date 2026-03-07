@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Shield, Sparkles, ChevronDown, ChevronUp, ExternalLink, RefreshCw, Volume2, VolumeX, Loader2 } from 'lucide-react'
+import { Shield, Sparkles, ChevronDown, ChevronUp, ExternalLink, RefreshCw, Volume2, VolumeX } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import AudioPlayer from '@/components/AudioPlayer'
@@ -38,11 +38,6 @@ const STATES = [
     'Maharashtra', 'Manipur', 'Meghalaya', 'Mizoram', 'Nagaland', 'Odisha', 'Punjab',
     'Rajasthan', 'Sikkim', 'Tamil Nadu', 'Telangana', 'Tripura', 'Uttar Pradesh',
     'Uttarakhand', 'West Bengal',
-]
-const CROPS = [
-    'Wheat', 'Rice (Paddy)', 'Maize', 'Cotton', 'Sugarcane', 'Soybean', 'Groundnut',
-    'Mustard', 'Onion', 'Potato', 'Tomato', 'Chilli', 'Turmeric', 'Pulses (Dal)',
-    'Fruits (Mixed)', 'Vegetables (Mixed)', 'Cattle / Livestock',
 ]
 
 // ── Component ────────────────────────────────────────────────────────────────

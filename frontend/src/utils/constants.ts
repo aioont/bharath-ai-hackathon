@@ -60,7 +60,7 @@ export const FARMING_SEASONS = [
   { id: 'zaid', name: 'Zaid (जायद)', period: 'March–June', crops: ['Watermelon', 'Muskmelon', 'Cucumber', 'Bitter Gourd'] },
 ]
 
-export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+export const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://agri-backend.makeasite.in'
 
 export const DISEASE_SEVERITY = {
   low: { label: 'Low', color: 'text-yellow-600 bg-yellow-50 border-yellow-200' },

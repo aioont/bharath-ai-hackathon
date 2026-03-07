@@ -20,6 +20,7 @@ export default function Translate() {
   const [targetLang, setTargetLang] = useState(state.selectedLanguage.code)
   const [loading, setLoading] = useState(false)
   const [confidence, setConfidence] = useState<number | null>(null)
+  const [isListening, setIsListening] = useState(false)
   const charLimit = 2000
 
   const handleTranslate = async () => {
@@ -150,6 +151,8 @@ export default function Translate() {
               onTranscript={(t) => setInputText(t)}
               language={sourceLang}
               className="p-2.5"
+              isListening={isListening}
+              setIsListening={setIsListening}
             />
           </div>
         </div>

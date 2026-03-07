@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import axios from 'axios'
 import { API_BASE_URL } from '@/utils/constants'
-import { Database, Search, ChevronLeft, ChevronRight, Loader2, RefreshCw } from 'lucide-react'
+import { Database, ChevronLeft, ChevronRight, Loader2, RefreshCw } from 'lucide-react'
 
 // Simple specific Axios instance for admin
 const adminApi = axios.create({
