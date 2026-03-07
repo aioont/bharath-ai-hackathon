@@ -27,7 +27,6 @@ yarn-debug.log*
 yarn-error.log*
 
 # Vite / Build
-frontend/dist/
 frontend/.vite/
 
 # IDE
