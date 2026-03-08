@@ -23,11 +23,11 @@ import structlog
 logger = structlog.get_logger()
 
 # ---------------------------------------------------------------------------
-# AWS Claude 3 Haiku as Evaluation Judge
+# Amazon Nova Lite as Evaluation Judge (available in ap-south-1, cheapest option)
 # ---------------------------------------------------------------------------
 
-class HaikuJudgeLLM:
-    """Wraps AWS Bedrock Claude 3 Haiku for use as a judge/grader model."""
+class NovaJudgeLLM:
+    """Wraps AWS Bedrock Amazon Nova Lite for use as a judge/grader model."""
 
     def __init__(self):
         try:
@@ -40,10 +40,10 @@ class HaikuJudgeLLM:
         if not self.client:
              return '{"score": 0.5, "reason": "bedrock client unavailable"}'
         try:
-            # Use Haiku for evaluation
-            return await asyncio.to_thread(self.client.invoke_haiku, prompt)
+            # Use Nova Lite for evaluation (cheap, available in ap-south-1)
+            return await asyncio.to_thread(self.client.invoke_nova, prompt)
         except Exception as exc:
-            logger.warning("haiku_judge_error", error=str(exc))
+            logger.warning("nova_judge_error", error=str(exc))
             return f'{{"score": 0.5, "reason": "error: {str(exc)}"}}'
 
 
@@ -103,9 +103,9 @@ def _guardrail_check(response: str, is_guardrail_test: bool) -> float:
 
 
 async def _llm_relevancy_score(
-    question: str, response: str, expected: str, judge: HaikuJudgeLLM
+    question: str, response: str, expected: str, judge: NovaJudgeLLM
 ) -> tuple[float, str]:
-    """Ask Haiku judge to grade relevancy of the response (0-1 scale)."""
+    """Ask Nova Lite judge to grade relevancy of the response (0-1 scale)."""
     prompt = (
         "You are an expert agricultural AI evaluator.\n"
         "Grade the following AI response on a scale of 0.0 to 1.0 for:\n"
@@ -141,7 +141,7 @@ async def _llm_relevancy_score(
 
 async def _run_one(
     tc: dict,
-    judge: HaikuJudgeLLM,
+    judge: NovaJudgeLLM,
     use_llm_judge: bool = True,
 ) -> dict:
     from app.services.sarvam_service import get_ai_response
@@ -232,7 +232,7 @@ async def run_evaluation(
         test_cases = [tc for tc in test_cases if tc.get("category") in categories]
     test_cases = test_cases[:max_cases]
 
-    judge = HaikuJudgeLLM()
+    judge = NovaJudgeLLM()
 
     # Run all test cases (sequentially to avoid rate limits)
     results = []
@@ -276,7 +276,7 @@ async def run_evaluation(
     guardrail_pass = sum(1 for r in guardrail_tests if r.get("passed", False))
 
     return {
-        "framework": "DeepEval (custom Claude 3 Haiku judge)",
+        "framework": "DeepEval (custom Amazon Nova Lite judge)",
         "total_cases": total,
         "passed": passed,
         "failed": total - passed,

@@ -29,6 +29,7 @@ prometheus-client>=0.19
 mangum>=0.17
 PyYAML>=6.0
 apscheduler>=3.10          # Background alert scheduler (weather + price agent)
+resend>=2.0.0              # Email delivery for reminders (v2 SDK)
 mem0ai>=0.1.31
 deepeval>=1.4.0
 duckduckgo-search>=4.1.0

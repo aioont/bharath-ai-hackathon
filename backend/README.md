@@ -81,7 +81,7 @@ Indian farmers face a critical **language barrier** when accessing agricultural 
   - `agriculture-kb`: 1,200+ farming docs (PDFs, web articles)
   - `insurance-kb`: 850+ govt schemes (myscheme.gov.in)
 - **Embedding Model:** Amazon Titan Embeddings G1 - Text
-- **Generation Model:** Claude 3 Haiku (cost-optimized choice)
+- **Generation Model:** Amazon Nova Pro (strong reasoning, available in ap-south-1)
 
 **Cost Without Caching:**
 ```
@@ -192,19 +192,20 @@ response = client.agentic_chat(
 )
 ```
 
-#### Secondary: **Claude 3 Haiku** (via Bedrock)
+#### Secondary: **Amazon Nova Pro / Nova Lite** (via Bedrock)
 **Use Cases:**
+- **Nova Pro**: Insurance recommendation reasoning (`invoke_nova(pro=True)`)
+- **Nova Lite**: Evaluation judge, general Bedrock tasks
 - Knowledge Base generation (RetrieveAndGenerate API)
-- Complex reasoning over retrieved documents
-- Guardrail enforcement (off-topic detection)
 
-**Why Claude Haiku?**
-- ✅ 200K context window (handles long documents)
-- ✅ Best cost/performance ratio in Claude family
-- ✅ On-demand pricing (no commitment)
-- ✅ Built-in Bedrock integration (no API setup)
+**Why Amazon Nova?**
+- ✅ Available in `ap-south-1` (Mumbai) — Claude 3 Haiku is not
+- ✅ Native `converse` API with tool calling support
+- ✅ Nova Lite: $0.06/1M input tokens (cheapest on Bedrock ap-south-1)
+- ✅ Nova Pro: $0.80/1M input tokens — strong reasoning for insurance
+- ✅ On-demand pricing (no commitment, ideal for hackathon)
 
-**Code:** [`app/core/aws_client.py`](app/core/aws_client.py) - `BedrockClient.retrieve_and_generate()`
+**Code:** [`app/core/aws_client.py`](app/core/aws_client.py) - `BedrockClient.invoke_nova()` / `BedrockClient.retrieve_and_generate()`
 
 #### Tertiary: **Sarvam Translate**
 **Use Cases:**
@@ -559,7 +560,8 @@ POST /api/eval/run-single?case_id=tc_weather_hindi_forecast
 
 ### 2. **Right LLM for Right Task (Technical Excellence)**
 - **Sarvam-M:** Multilingual reasoning, native Indic language support
-- **Claude Haiku:** Document retrieval (200K context)
+- **Amazon Nova Pro:** Insurance reasoning; document retrieval via KB
+- **Amazon Nova Lite:** Evaluation judge (cheapest Bedrock model in ap-south-1)
 - **Sarvam Translate:** Domain-specific agricultural vocabulary
 - **Result:** 5x cheaper than GPT-4 with better Indic accuracy
 

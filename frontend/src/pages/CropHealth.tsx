@@ -1,8 +1,8 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { useDropzone } from 'react-dropzone'
-import { Upload, ImageIcon, AlertTriangle, CheckCircle, Leaf, Lightbulb } from 'lucide-react'
+import { Upload, ImageIcon, AlertTriangle, CheckCircle, Leaf, Lightbulb, Zap } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { analyzeCropHealth } from '@/services/api'
+import { analyzeCropHealth, getCropModelStatus, startCropModel } from '@/services/api'
 import type { CropHealthResponse } from '@/services/api'
 import LoadingSpinner from '@/components/LoadingSpinner'
 import { DISEASE_SEVERITY, CROP_CATEGORIES } from '@/utils/constants'
@@ -15,6 +15,41 @@ export default function CropHealth() {
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<CropHealthResponse | null>(null)
   const [selectedCrop, setSelectedCrop] = useState('')
+  const [modelStatus, setModelStatus] = useState<string>('UNKNOWN')
+  const [modelMessage, setModelMessage] = useState<string>('Checking model…')
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  const stopPolling = () => {
+    if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
+  }
+
+  const fetchModelStatus = useCallback(async () => {
+    try {
+      const s = await getCropModelStatus()
+      setModelStatus(s.status)
+      setModelMessage(s.message)
+      if (s.status === 'RUNNING' || s.status === 'FAILED' || s.status === 'UNAVAILABLE') {
+        stopPolling()
+      }
+    } catch { /* silent */ }
+  }, [])
+
+  // On mount: fetch status + start polling while not RUNNING
+  useEffect(() => {
+    fetchModelStatus()
+    pollRef.current = setInterval(fetchModelStatus, 8000)
+    return () => stopPolling()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const handleStartModel = async () => {
+    try {
+      await startCropModel()
+      setModelStatus('STARTING')
+      setModelMessage('🟡 Model warming up — takes 2-3 min (AI fallback active)')
+      if (!pollRef.current) pollRef.current = setInterval(fetchModelStatus, 8000)
+    } catch { toast.error('Could not start model') }
+  }
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const file = acceptedFiles[0]
@@ -48,35 +83,44 @@ export default function CropHealth() {
       if (selectedCrop) formData.append('crop_name', selectedCrop)
       const data = await analyzeCropHealth(formData)
       setResult(data)
-    } catch (_) {
-      // Demo fallback
-      setResult({
-        disease_name: 'Early Blight (Demo)',
-        confidence: 0.87,
-        severity: 'medium',
-        description: 'Early blight is a common fungal disease caused by Alternaria solani. This is a demo response — connect to Sarvam Vision for real analysis.',
-        symptoms: [
-          'Brown circular spots with concentric rings (target-like appearance)',
-          'Yellow halo surrounding the lesions',
-          'Premature leaf drop in severe cases',
-          'Dark brown lesions on stem and fruit',
-        ],
-        treatment: [
-          'Apply copper-based fungicides (Copper Oxychloride @ 3g/L)',
-          'Use Mancozeb 75% WP @ 2g/L spray every 7-10 days',
-          'Remove and destroy infected plant debris',
-          'Ensure proper plant spacing for air circulation',
-        ],
-        prevention: [
-          'Use certified disease-resistant varieties',
-          'Practice crop rotation (avoid planting solanaceous crops in same field)',
-          'Avoid overhead irrigation; use drip irrigation',
-          'Maintain proper field sanitation',
-          'Apply balanced nutrition to strengthen plants',
-        ],
-        affected_crops: ['Tomato', 'Potato', 'Brinjal', 'Pepper'],
-      })
-      toast('Demo analysis shown. Add SARVAM_API_KEY for real AI diagnosis.', { icon: 'ℹ️' })
+      // Refresh model status badge after successful analysis
+      fetchModelStatus()
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { status?: number; data?: { detail?: string } } }
+      if (axiosErr?.response?.status === 503) {
+        toast('Custom model warming up — showing AI analysis fallback', { icon: '⚡' })
+      } else if (axiosErr?.response?.status === 400) {
+        toast.error(axiosErr.response.data?.detail ?? 'Invalid image')
+      } else {
+        // Demo fallback
+        setResult({
+          disease_name: 'Early Blight (Demo)',
+          confidence: 0.87,
+          severity: 'medium',
+          description: 'Early blight is a common fungal disease caused by Alternaria solani. This is a demo response — connect to Sarvam Vision for real analysis.',
+          symptoms: [
+            'Brown circular spots with concentric rings (target-like appearance)',
+            'Yellow halo surrounding the lesions',
+            'Premature leaf drop in severe cases',
+            'Dark brown lesions on stem and fruit',
+          ],
+          treatment: [
+            'Apply copper-based fungicides (Copper Oxychloride @ 3g/L)',
+            'Use Mancozeb 75% WP @ 2g/L spray every 7-10 days',
+            'Remove and destroy infected plant debris',
+            'Ensure proper plant spacing for air circulation',
+          ],
+          prevention: [
+            'Use certified disease-resistant varieties',
+            'Practice crop rotation (avoid planting solanaceous crops in same field)',
+            'Avoid overhead irrigation; use drip irrigation',
+            'Maintain proper field sanitation',
+            'Apply balanced nutrition to strengthen plants',
+          ],
+          affected_crops: ['Tomato', 'Potato', 'Brinjal', 'Pepper'],
+        })
+        toast('Demo analysis shown. Add SARVAM_API_KEY for real AI diagnosis.', { icon: 'ℹ️' })
+      }
     } finally {
       setLoading(false)
     }
@@ -93,6 +137,30 @@ export default function CropHealth() {
         <p className="section-subtitle">
           Upload a photo of your crop to identify diseases and get AI-powered treatment recommendations
         </p>
+      </div>
+
+      {/* Model Status Banner */}
+      <div className={`flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl border text-xs font-medium ${
+        modelStatus === 'RUNNING' ? 'bg-green-50 border-green-200 text-green-800' :
+        modelStatus === 'STARTING' ? 'bg-amber-50 border-amber-200 text-amber-800' :
+        modelStatus === 'UNAVAILABLE' ? 'bg-gray-50 border-gray-200 text-gray-500' :
+        modelStatus === 'FAILED' ? 'bg-red-50 border-red-200 text-red-700' :
+        'bg-gray-50 border-gray-200 text-gray-600'
+      }`}>
+        <span className="flex items-center gap-2">
+          {modelStatus === 'STARTING' && <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />}
+          {modelStatus === 'RUNNING' && <span className="w-2 h-2 rounded-full bg-green-500" />}
+          {!['RUNNING','STARTING'].includes(modelStatus) && <span className="w-2 h-2 rounded-full bg-gray-300" />}
+          {modelMessage}
+        </span>
+        {(modelStatus === 'STOPPED' || modelStatus === 'UNKNOWN') && (
+          <button
+            onClick={handleStartModel}
+            className="flex items-center gap-1 px-2.5 py-1 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+          >
+            <Zap size={11} /> Start Model
+          </button>
+        )}
       </div>
 
       {/* Crop Type Selector */}
@@ -195,6 +263,45 @@ export default function CropHealth() {
       {/* Results */}
       {result && (
         <div className="space-y-4 animate-slide-up">
+          {/* Raw Custom Label Detections */}
+          {result.raw_labels && result.raw_labels.length > 0 && (
+            <div className="card border border-violet-100 bg-violet-50">
+              <h3 className="font-semibold text-violet-800 flex items-center gap-2 mb-3">
+                <Zap size={16} className="text-violet-600" /> Custom Model Detections
+                <span className="ml-auto text-xs font-normal text-violet-500">AWS Rekognition</span>
+              </h3>
+              <div className="space-y-2">
+                {result.raw_labels.map((lbl, i) => (
+                  <div key={i}>
+                    <div className="flex justify-between text-xs mb-1">
+                      <span className="font-medium text-violet-900">{lbl.name}</span>
+                      <span className="text-violet-600">{Math.round(lbl.confidence * 100)}%</span>
+                    </div>
+                    <div className="h-1.5 bg-violet-100 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-gradient-to-r from-violet-500 to-purple-600 rounded-full transition-all"
+                        style={{ width: `${Math.round(lbl.confidence * 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Analysis source badge */}
+          {result.model_source && (
+            <div className="flex items-center gap-2 text-xs text-gray-400 px-1">
+              <span className={`w-2 h-2 rounded-full ${
+                result.model_source === 'rekognition_custom' ? 'bg-violet-500' :
+                result.model_source === 'rekognition_general' ? 'bg-blue-400' : 'bg-gray-300'
+              }`} />
+              {result.model_source === 'rekognition_custom' && 'Analysed by Rekognition Custom Disease Model + Nova AI'}
+              {result.model_source === 'rekognition_general' && 'Analysed by Rekognition General Labels + Nova AI'}
+              {result.model_source === 'fallback' && 'AI text analysis (model offline)'}
+            </div>
+          )}
+
           {/* Disease Header */}
           <div className={`card border-2 ${severityConfig?.color.split('bg-')[1] ? 'border-' + severityConfig?.color.split('border-')[1] : 'border-gray-200'}`}>
             <div className="flex items-start gap-4">
