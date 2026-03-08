@@ -839,8 +839,10 @@ async def generate_tts_audio(text: str, language: str = "en") -> Optional[str]:
 
 
 # ---------------------------------------------------------------------------
-# Crop Disease Analysis  (AWS Rekognition labels → Sarvam-M diagnosis)
-# Sarvam Vision is OCR-only; we use Rekognition for image understanding.
+# Crop Disease Analysis
+# Flow: AWS Rekognition Custom Labels (image → disease label)
+#       → Sarvam-M / Nova Lite (label + crop → symptoms, treatment, prevention
+#         generated in the farmer's native language)
 # ---------------------------------------------------------------------------
 
 def _rekognition_labels(image_bytes: bytes) -> list[str]:
@@ -960,7 +962,21 @@ async def analyze_crop_disease(
             raw = await asyncio.to_thread(_sync_diagnose, prompt)
         except Exception as exc:
             logger.warning("crop_disease_fallback", error=str(exc))
-            result = _demo_vision(crop_name, language)
+            # Both Nova and Sarvam-M failed — build a minimal but honest response
+            # using the detected labels so the farmer at least sees the disease name
+            disease_name = (
+                custom_labels[0]["name"].replace("_", " ") if custom_labels else (crop_name or "Unknown")
+            )
+            result = {
+                "disease_name": disease_name,
+                "confidence": custom_labels[0]["confidence"] if custom_labels else 0.5,
+                "severity": "medium",
+                "description": f"Disease detected: {disease_name}. AI advisory unavailable — please consult a local Krishi Vigyan Kendra (KVK) or agricultural officer.",
+                "symptoms": [],
+                "treatment": [],
+                "prevention": [],
+                "affected_crops": [crop_name] if crop_name else [],
+            }
             result["model_source"] = "fallback"
             result["raw_labels"] = custom_labels or []
             return result
@@ -1020,30 +1036,16 @@ def _demo_chat(message: str, language: str) -> dict:
 
 
 def _demo_vision(crop_name: Optional[str], language: str) -> dict:
+    """Kept as a named symbol but no longer called in the main flow.
+    The main fallback now returns detected label data directly."""
     crop = crop_name or "crop"
     return {
-        "disease_name": f"Leaf Blight ({crop})",
-        "confidence": 0.85,
+        "disease_name": f"Disease detected on {crop}",
+        "confidence": 0.5,
         "severity": "medium",
-        "description": (
-            f"Early signs of fungal infection detected on {crop}. "
-            "Brownish water-soaked lesions visible on leaves."
-        ),
-        "symptoms": [
-            "Brown water-soaked lesions on leaves",
-            "Yellowing around infected areas",
-            "Premature leaf drop",
-        ],
-        "treatment": [
-            "Apply Mancozeb 75WP @ 2.5g/litre water",
-            "Remove and destroy infected plant parts",
-            "Avoid overhead irrigation",
-        ],
-        "prevention": [
-            "Use certified disease-free seeds",
-            "Maintain proper plant spacing",
-            "Ensure good drainage",
-            "Rotate crops every season",
-        ],
+        "description": f"Disease detected on {crop} crop. AI advisory unavailable — please consult a local Krishi Vigyan Kendra (KVK) or agricultural officer.",
+        "symptoms": [],
+        "treatment": [],
+        "prevention": [],
         "affected_crops": [crop],
     }
