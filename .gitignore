@@ -48,6 +48,9 @@ Thumbs.db
 # Uploaded files (local dev)
 backend/uploads/
 
+# Backend configuration (contains secrets)
+backend/app/core/config.py
+
 # Coverage
 .coverage
 htmlcov/
