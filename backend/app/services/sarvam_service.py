@@ -631,6 +631,7 @@ def _sync_chat(messages: list, system: str) -> str:
         combined = [{"role": "user", "content": system}] + messages
 
     response = client.chat.completions(
+        model=settings.SARVAM_CHAT_MODEL,
         messages=combined,
         temperature=0.3,
         top_p=0.9,
@@ -881,6 +882,7 @@ def _sync_diagnose(prompt: str) -> str:
     )
     # Sarvam API does not support system role — prefix instructions to user message
     response = client.chat.completions(
+        model=settings.SARVAM_CHAT_MODEL,
         messages=[{"role": "user", "content": f"{system}\n\n{prompt}"}],
         temperature=0.2,
         max_tokens=800,
