@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
-  User, Phone, MapPin, Sprout, LayoutGrid, CheckCircle,
+  User, Phone, MapPin, Sprout, LayoutGrid,
   Edit3, Save, Trash2, Mail, Plus, Star, StarOff, PenLine,
   Droplets, Calendar, Leaf, X, ChevronDown, ChevronUp, Loader2, Ruler, Globe,
 } from 'lucide-react'
@@ -10,7 +10,7 @@ import { MARKET_STATES, SOIL_TYPES, CROP_CATEGORIES } from '@/utils/constants'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import {
-  getCrops, addCrop, updateCrop, deleteCrop, setPrimaryCrop,
+  getCrops, addCrop, updateCrop, deleteCrop, setPrimaryCrop, getMe,
   type FarmerCrop, type CropCreate,
 } from '@/services/api'
 
@@ -44,8 +44,6 @@ const IRRIG_LABEL_KEY: Record<string, string> = {
   rainfed: 'irrigRainfed', canal: 'irrigCanal', drip: 'irrigDrip',
   sprinkler: 'irrigSprinkler', borewell: 'irrigBorewell', other: 'irrigOther',
 }
-// Completion now only counts: name, phone, state, district, farmingType
-const COMPLETION_FIELDS: (keyof UserProfile)[] = ['name', 'phone', 'state', 'district', 'farmingType']
 
 const EMPTY_CROP_FORM: CropCreate = {
   crop_name: '',
@@ -338,7 +336,7 @@ function CropCard({
 
 // ─── Main Profile Page ────────────────────────────────────────────────────────
 export default function Profile() {
-  const { state, setProfile, t } = useAppContext()
+  const { state, setProfile, setAuth, t } = useAppContext()
   const existingProfile = state.userProfile
   const authUser = state.authUser
   const navigate = useNavigate()
@@ -348,25 +346,29 @@ export default function Profile() {
   const [editing, setEditing] = useState(!existingProfile?.isProfileComplete)
   const [form, setForm] = useState<Omit<UserProfile, 'isProfileComplete'>>({
     name: existingProfile?.name || authUser?.full_name || '',
-    phone: existingProfile?.phone || '',
-    state: existingProfile?.state || '',
-    district: existingProfile?.district || '',
-    farmingType: existingProfile?.farmingType || 'conventional',
+    phone: existingProfile?.phone || authUser?.phone || '',
+    state: existingProfile?.state || authUser?.state || '',
+    district: existingProfile?.district || authUser?.district || '',
+    farmingType: (existingProfile?.farmingType || authUser?.farming_type || 'conventional') as UserProfile['farmingType'],
   })
 
-  // Update form when profile or auth loads from localStorage
+  // Fetch fresh profile from server on mount — overrides stale localStorage
   useEffect(() => {
-    if (existingProfile || authUser) {
+    if (!authUser) return
+    getMe().then(user => {
       setForm({
-        name: existingProfile?.name || authUser?.full_name || '',
-        phone: existingProfile?.phone || '',
-        state: existingProfile?.state || '',
-        district: existingProfile?.district || '',
-        farmingType: existingProfile?.farmingType || 'conventional',
+        name: user.full_name || '',
+        phone: user.phone || '',
+        state: user.state || '',
+        district: user.district || '',
+        farmingType: (user.farming_type || 'conventional') as UserProfile['farmingType'],
       })
-      setEditing(!existingProfile?.isProfileComplete)
-    }
-  }, [existingProfile, authUser])
+      setEditing(!user.full_name || !user.state)
+      // Keep authUser in context + localStorage in sync
+      setAuth(user, state.authToken!)
+    }).catch(() => { /* silently use cached data on network error */ })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authUser?.id])
 
   // ── Multi-crop state ──
   const [crops, setCrops] = useState<FarmerCrop[]>([])
@@ -420,20 +422,6 @@ export default function Profile() {
     return null
   }
 
-  // ── Profile completion — name, phone, state, district, farmingType ──
-  const completionScore = () => {
-    let filled = 0
-    if (form.name.trim()) filled++
-    if (form.phone.trim()) filled++
-    if (form.state) filled++
-    if (form.district.trim()) filled++
-    if (form.farmingType) filled++
-    // Bonus: has at least one crop
-    const base = Math.round((filled / COMPLETION_FIELDS.length) * 80) // 80% from profile fields
-    const cropBonus = crops.length > 0 ? 20 : 0
-    return Math.min(100, base + cropBonus)
-  }
-
   const handleSave = async () => {
     if (!form.name.trim()) { toast.error('Please enter your name'); return }
     if (form.phone.trim() && !/^[0-9]{10}$/.test(form.phone.trim())) {
@@ -443,29 +431,24 @@ export default function Profile() {
     
     try {
       const { updateProfile } = await import('@/services/api')
-      await updateProfile({
+      const updatedUser = await updateProfile({
         full_name: form.name,
+        phone: form.phone || undefined,
         state: form.state,
         district: form.district,
         farming_type: form.farmingType,
-        language: state.selectedLanguage.code
+        language: state.selectedLanguage.code,
       })
-      
-      const score = completionScore()
-      const profile: UserProfile = { ...form, isProfileComplete: score >= 75 }
-      setProfile(profile)
+
+      // Keep authUser in context + localStorage current
+      setAuth(updatedUser, state.authToken!)
+
+      setProfile({ ...form, isProfileComplete: true })
       setEditing(false)
-      toast.success(`Profile saved! ${score}% complete`)
+      toast.success('Profile saved!')
     } catch {
       toast.error('Failed to save profile')
     }
-  }
-
-  const handleDelete = () => {
-    setProfile(null)
-    setForm({ name: '', phone: '', state: '', district: '', farmingType: 'conventional' })
-    setEditing(true)
-    toast('Profile cleared', { icon: '🗑️' })
   }
 
   // ── Crop handlers ──
@@ -527,9 +510,6 @@ export default function Profile() {
     }
   }
 
-  const score = completionScore()
-  const barColor = score >= 75 ? 'bg-green-500' : score >= 40 ? 'bg-amber-500' : 'bg-red-400'
-
   if (!authUser) return null
 
   return (
@@ -542,82 +522,64 @@ export default function Profile() {
           </h1>
           <p className="text-xs text-gray-500 mt-0.5">Personalise your experience — weather, market &amp; AI advice</p>
         </div>
-        {existingProfile && !editing && (
+        {!editing && (
           <button onClick={() => setEditing(true)} className="btn-secondary flex items-center gap-2 text-sm">
             <Edit3 size={15} /> {t('editBtn')}
           </button>
         )}
       </div>
 
-      {/* Profile Completion */}
+      {/* ── Account Summary (always visible) ─── */}
       <div className="card">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-sm font-semibold text-gray-700">{t('profileCompletion')}</span>
-          <span className={`text-sm font-bold ${score >= 75 ? 'text-green-600' : score >= 40 ? 'text-amber-600' : 'text-red-500'}`}>{score}%</span>
+        <div className="flex items-center gap-4 pb-4 border-b border-gray-100">
+          <div className="w-14 h-14 bg-agri-gradient rounded-2xl flex items-center justify-center text-3xl shadow-md shrink-0">
+            👨‍🌾
+          </div>
+          <div className="min-w-0">
+            <h2 className="font-bold text-base text-gray-900 truncate">{form.name || authUser.full_name || 'Farmer'}</h2>
+            <p className="text-xs text-gray-500 truncate">{authUser.email}</p>
+            {(form.state || authUser.state) && (
+              <p className="text-xs text-gray-400 mt-0.5">
+                {(form.district || authUser.district) ? `${form.district || authUser.district}, ` : ''}{form.state || authUser.state}
+              </p>
+            )}
+          </div>
         </div>
-        <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
-          <div className={`h-full rounded-full transition-all duration-500 ${barColor}`} style={{ width: `${score}%` }} />
-        </div>
-        <div className="flex items-center justify-between mt-1.5">
-          {score >= 75 ? (
-            <p className="text-xs text-green-600 flex items-center gap-1">
-              <CheckCircle size={12} /> {t('profileComplete')}
-            </p>
-          ) : (
-            <p className="text-xs text-gray-500">
-              {t('profileIncomplete')}
-            </p>
-          )}
-          <p className="text-[10px] text-gray-400">Profile 80% + Crops 20%</p>
+        <div className="grid grid-cols-2 gap-3 pt-4">
+          <div className="flex items-center gap-2">
+            <Mail size={13} className="text-gray-400 shrink-0" />
+            <div className="min-w-0">
+              <p className="text-[10px] text-gray-400">Email</p>
+              <p className="text-xs font-medium text-gray-700 truncate">{authUser.email}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Phone size={13} className="text-gray-400 shrink-0" />
+            <div>
+              <p className="text-[10px] text-gray-400">Phone</p>
+              <p className="text-xs font-medium text-gray-700">{form.phone || authUser.phone || '—'}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <MapPin size={13} className="text-gray-400 shrink-0" />
+            <div className="min-w-0">
+              <p className="text-[10px] text-gray-400">Location</p>
+              <p className="text-xs font-medium text-gray-700 truncate">
+                {(form.state || authUser.state)
+                  ? `${form.district || authUser.district || ''} ${form.district || authUser.district ? ',' : ''} ${form.state || authUser.state}`.trim().replace(/^,\s*/, '')
+                  : '—'}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-sm shrink-0">🚜</span>
+            <div>
+              <p className="text-[10px] text-gray-400">Farming</p>
+              <p className="text-xs font-medium text-gray-700 capitalize">{form.farmingType || authUser.farming_type || '—'}</p>
+            </div>
+          </div>
         </div>
       </div>
-
-      {/* ── View Mode ─── */}
-      {!editing && existingProfile && (
-        <div className="card space-y-4">
-          <div className="flex items-center gap-4 pb-4 border-b border-gray-100">
-            <div className="w-16 h-16 bg-agri-gradient rounded-2xl flex items-center justify-center text-3xl shadow-md">
-              👨‍🌾
-            </div>
-            <div>
-              <h2 className="font-bold text-lg text-gray-900">{existingProfile.name || 'Farmer'}</h2>
-              {existingProfile.state && (
-                <p className="text-sm text-gray-500">
-                  {existingProfile.district ? `${existingProfile.district}, ` : ''}{existingProfile.state}
-                </p>
-              )}
-              {existingProfile.phone && <p className="text-xs text-gray-400">{existingProfile.phone}</p>}
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            {[
-              { label: 'Farming Type', value: existingProfile.farmingType, icon: '🚜' },
-              { label: 'Total Crops', value: `${crops.length} crop${crops.length !== 1 ? 's' : ''}`, icon: '🌾' },
-              { label: 'Primary Crop', value: crops.find(c => c.is_primary)?.crop_name || '—', icon: '⭐' },
-              {
-                label: 'Total Area',
-                value: crops.reduce((sum, c) => sum + (c.area_acres || 0), 0) > 0
-                  ? `${crops.reduce((sum, c) => sum + (c.area_acres || 0), 0).toFixed(1)} acres`
-                  : '—',
-                icon: '📐',
-              },
-              { label: 'Language', value: `${state.selectedLanguage.flag} ${state.selectedLanguage.englishName}`, icon: '🌐' },
-            ].map(item => (
-              <div key={item.label} className="bg-gray-50 rounded-xl p-3">
-                <div className="text-lg mb-1">{item.icon}</div>
-                <div className="text-xs text-gray-500">{item.label}</div>
-                <div className="text-sm font-semibold text-gray-800 capitalize">{item.value || '—'}</div>
-              </div>
-            ))}
-          </div>
-          <button
-            onClick={handleDelete}
-            className="text-xs text-red-400 hover:text-red-600 flex items-center gap-1 transition-colors"
-          >
-            <Trash2 size={12} /> {t('clearProfile')}
-          </button>
-        </div>
-      )}
 
       {/* ── Edit Form ─── */}
       {editing && (
