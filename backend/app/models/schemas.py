@@ -90,6 +90,8 @@ class CropHealthResponse(BaseModel):
     prevention: List[str]
     affected_crops: List[str]
     image_url: Optional[str] = None
+    raw_labels: Optional[List[dict]] = None   # Rekognition Custom Labels detections
+    model_source: Optional[str] = None        # 'rekognition_custom' | 'rekognition_general' | 'fallback'
 
 
 # ─── Weather ──────────────────────────────────────────────────────────────────

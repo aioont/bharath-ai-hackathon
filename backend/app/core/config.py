@@ -23,12 +23,25 @@ class Settings(BaseSettings):
 
     # Bedrock
     BEDROCK_CLAUDE_MODEL_ID: str = "anthropic.claude-3-haiku-20240307-v1:0"
+    # Amazon Nova — available in ap-south-1, supports tool calling via converse API
+    BEDROCK_NOVA_LITE_MODEL_ID: str = "amazon.nova-lite-v1:0"    # direct model ID (for converse API)
+    BEDROCK_NOVA_PRO_MODEL_ID: str = "amazon.nova-pro-v1:0"      # direct model ID (for converse API)
+    # Cross-region inference profiles — REQUIRED for RetrieveAndGenerate + Knowledge Base APIs
+    # apac. prefix = Asia Pacific cross-region profile (covers ap-south-1)
+    BEDROCK_NOVA_LITE_PROFILE_ID: str = "apac.amazon.nova-lite-v1:0"
+    BEDROCK_NOVA_PRO_PROFILE_ID: str = "apac.amazon.nova-pro-v1:0"
     BEDROCK_GUARDRAIL_ID: str = ""
     BEDROCK_GUARDRAIL_VERSION: str = "DRAFT"
 
     # Bedrock Knowledge Bases
     BEDROCK_INSURANCE_KB_ID: str = ""  # Insurance schemes KB
     BEDROCK_AGRI_KB_ID: str = ""       # Agriculture knowledge KB (farming, crops, pests)
+
+    # Rekognition Custom Labels — Plant Leaf Disease Detection
+    REKOGNITION_PROJECT_ARN: str = "arn:aws:rekognition:ap-south-1:491694398551:project/plant-leaf-disease-detection/1772879301145"
+    REKOGNITION_MODEL_ARN: str = "arn:aws:rekognition:ap-south-1:491694398551:project/plant-leaf-disease-detection/version/plant-leaf-disease-detection.2026-03-07T23.08.44/1772905124476"
+    REKOGNITION_MODEL_VERSION: str = "plant-leaf-disease-detection.2026-03-07T23.08.44"
+    REKOGNITION_MIN_CONFIDENCE: float = 50.0
 
     # Database (PostgreSQL - Supabase or AWS RDS)
     # Supabase example: postgresql://postgres:PASSWORD@db.xxx.supabase.co:5432/postgres
@@ -61,6 +74,7 @@ class Settings(BaseSettings):
 
     # Resend (email)
     RESEND_API_KEY: str = ""
+    RESEND_FROM_EMAIL: str = "AgriSaarthi <send@makeasite.in>"
 
     # Rate limiting
     RATE_LIMIT_PER_MINUTE: int = 60

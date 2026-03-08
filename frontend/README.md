@@ -189,7 +189,7 @@ const speakOutput = () => {
 
 **Features:**
 - **Image Upload:** Drag-and-drop or camera capture
-- **AI Analysis:** Sarvam Vision + Claude 3 Haiku
+- **AI Analysis:** Sarvam Vision + Amazon Nova Lite
 - **Results:**
   - Disease name + confidence score
   - Severity level (Low/Medium/High)

@@ -14,10 +14,16 @@ log = structlog.get_logger()
 
 
 def get_current_user_optional(creds: Optional[HTTPAuthorizationCredentials] = Depends(security)) -> Optional[dict]:
-    """Get current user if authenticated, else None."""
+    """Get current user (id + email) from JWT token if authenticated, else None."""
     try:
-        user_id = get_current_user_id(creds)
-        return {"id": user_id} if user_id else None
+        if creds is None:
+            return None
+        from app.api.routes.auth import _decode_token
+        payload = _decode_token(creds.credentials)
+        user_id = payload.get("sub")
+        if not user_id:
+            return None
+        return {"id": user_id, "email": payload.get("email", "")}
     except:
         return None
 
@@ -103,12 +109,17 @@ async def chat(
             )
         
         # ─── STEP 4: Generate AI response (cache miss) ────────────────────
+        # Email comes from the JWT token — no extra DB round-trip needed
+        user_email = (current_user.get("email") or "") if current_user else ""
+
         result = await get_ai_response(
             message=request.message,
             language=request.language,
             conversation_history=request.conversation_history,
             category=request.category,
             farmer_profile=request.farmer_profile,
+            user_id=user_id or "anonymous",
+            user_email=user_email,
         )
         
         # ─── STEP 5: Generate TTS audio if requested ──────────────────────

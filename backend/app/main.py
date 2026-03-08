@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 
 from app.core.config import settings
 from app.api.routes import translate, chat, crop_health, weather, market, forum, news, auth, crops
-from app.api.routes import plan, market_analyzer, mock_iot, evaluation, insurance, admin, alerts
+from app.api.routes import plan, market_analyzer, mock_iot, evaluation, insurance, admin, alerts, reminders
 
 # ---------------------------------------------------------------------------
 # Logging — configure stdlib logging so every logger in every route works
@@ -84,8 +84,43 @@ async def lifespan(app: FastAPI):
             max_instances=1,
             misfire_grace_time=300,
         )
+        # ── Reminder dispatch every minute ───────────────────────────────
+        from app.services.reminder_service import dispatch_due_reminders, check_market_price_alerts
+
+        scheduler.add_job(
+            dispatch_due_reminders,
+            trigger="interval",
+            minutes=1,
+            id="reminder_dispatch",
+            max_instances=1,
+            misfire_grace_time=30,
+        )
+        # Market-price reminder check every 2 hours (alongside price scan)
+        scheduler.add_job(
+            check_market_price_alerts,
+            trigger="interval",
+            hours=2,
+            id="market_price_alert_check",
+            max_instances=1,
+            misfire_grace_time=300,
+        )
+        # ── Rekognition idle-stop every 5 minutes ────────────────────────────────
+        async def _rekognition_idle_check():
+            from app.core.aws_client import get_rekognition_client
+            client = get_rekognition_client()
+            if client:
+                client.check_idle_stop()
+
+        scheduler.add_job(
+            _rekognition_idle_check,
+            trigger="interval",
+            minutes=5,
+            id="rekognition_idle_check",
+            max_instances=1,
+            misfire_grace_time=60,
+        )
         scheduler.start()
-        log.info("alert_scheduler_started jobs=weather(6h),price(2h)")
+        log.info("alert_scheduler_started jobs=weather(6h),price(2h),reminders(1m),market_alerts(2h)")
     except ImportError:
         log.warning("apscheduler not installed — alert scheduler disabled. "
                     "Run: pip install apscheduler")
@@ -167,6 +202,7 @@ app.include_router(evaluation.router)
 app.include_router(insurance.router)
 app.include_router(admin.router)  # Cache statistics & management
 app.include_router(alerts.router) # Autonomous alert preferences & triggers
+app.include_router(reminders.router)  # Agent-driven reminder scheduling
 
 
 # ---------------------------------------------------------------------------

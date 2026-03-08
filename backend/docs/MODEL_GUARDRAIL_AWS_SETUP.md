@@ -4,7 +4,8 @@ This project uses AWS Bedrock for advanced AI capabilities including:
 - **Guardrails**: Content filtering for safe chat
 - **Insurance Knowledge Base**: RAG for insurance scheme suggestions
 - **Agriculture Knowledge Base**: RAG for farming knowledge/recommendations (agent tool)
-- **Claude 3 Haiku**: Intelligent response formatting and evaluation
+- **Amazon Nova Pro**: Intelligent insurance reasoning (strong, available in ap-south-1)
+- **Amazon Nova Lite**: Evaluation judge (cheapest Bedrock model in ap-south-1)
 
 ## Prerequisites
 
@@ -20,8 +21,8 @@ This project uses AWS Bedrock for advanced AI capabilities including:
 2.  Click **Model access** in the bottom left sidebar.
 3.  Click **Manage model access**.
 4.  Select the following models:
-    *   **Anthropic**: `Claude 3 Haiku`
-    *   **Amazon**: `Titan Text Embeddings V2` (for Knowledge Base) & `Titan Text G1 - Express` (generic fallback)
+    *   **Amazon**: `Nova Pro` (insurance reasoning), `Nova Lite` (evaluation judge)
+    *   **Amazon**: `Titan Text Embeddings V2` (for Knowledge Base)
 5.  Click **Request model access**. Access is usually granted instantly.
 
 ---
@@ -188,7 +189,9 @@ S3_BUCKET_NAME=agri-translate-images
 S3_REGION=ap-south-1
 
 # Bedrock Models
-BEDROCK_CLAUDE_MODEL_ID=anthropic.claude-3-haiku-20240307-v1:0
+BEDROCK_CLAUDE_MODEL_ID=anthropic.claude-3-haiku-20240307-v1:0  # Fallback only
+BEDROCK_NOVA_LITE_MODEL_ID=amazon.nova-lite-v1:0                # Evaluation judge
+BEDROCK_NOVA_PRO_MODEL_ID=amazon.nova-pro-v1:0                  # Insurance reasoning
 
 # Bedrock Guardrail (from Step 4)
 BEDROCK_GUARDRAIL_ID=your_guardrail_id
@@ -223,7 +226,7 @@ BEDROCK_AGRI_KB_ID: str = ""       # NEW for agriculture KB
 
 3.  **Test Insurance KB**: 
     - Go to Insurance Suggestion page. 
-    - It should use the insurance KB and format with Claude 3 Haiku.
+    - It should use the insurance KB and format with Amazon Nova Pro.
 
 4.  **Test Agriculture KB (Agent Tool)**:
     - In Expert Chat, ask: *"What are the best farming practices for growing tomatoes?"*
@@ -240,7 +243,7 @@ BEDROCK_AGRI_KB_ID: str = ""       # NEW for agriculture KB
 
 ### Insurance Endpoint
 - Uses `BedrockClient.retrieve_and_generate()` with `BEDROCK_INSURANCE_KB_ID`.
-- Uses `invoke_haiku()` for final formatting.
+- Uses `invoke_nova(pro=True)` for final formatting (Amazon Nova Pro).
 
 ### Agriculture Knowledge (Agent Tool)
 - **Tool Name**: `KNOWLEDGE`
@@ -252,7 +255,7 @@ BEDROCK_AGRI_KB_ID: str = ""       # NEW for agriculture KB
   - "Soil preparation for mango orchard?"
 
 ### Evaluation
-- Uses `Claude 3 Haiku` as a judge to evaluate AI response quality.
+- Uses `Amazon Nova Lite` as a judge to evaluate AI response quality.
 
 ---
 
@@ -263,7 +266,7 @@ BEDROCK_AGRI_KB_ID: str = ""       # NEW for agriculture KB
     - Your collection `bedrock-knowledge-base-28lv9v` can easily handle both KBs
     - Current usage: 9.42 MiB (can scale to GBs)
 2.  **Limit Sync Frequency**: Only sync when you add new documents.
-3.  **Use Haiku**: Claude 3 Haiku is 25x cheaper than Opus.
+3.  **Use Nova Lite**: Amazon Nova Lite ($0.06/1M tokens) is the most cost-efficient model available in ap-south-1. Use Nova Pro only for insurance reasoning.
 4.  **Chunk Size**: Default 300 tokens is good; don't make too small (more embeddings = higher cost).
 5.  **OpenSearch Serverless Pricing**: ~$90/month for vector search workload (no free tier).
     - Formula: OCU (OpenSearch Compute Units) × Hours × $0.24/hour
@@ -290,7 +293,7 @@ BEDROCK_AGRI_KB_ID: str = ""       # NEW for agriculture KB
 - **Check**: Is `BEDROCK_GUARDRAIL_VERSION` set to the version number (not "DRAFT")?
 
 ### Access Denied Errors
-- **Solution**: Go to Model Access and ensure Claude 3 Haiku is enabled.
+- **Solution**: Go to Model Access and enable **Amazon Nova Lite** and **Amazon Nova Pro** (both available in ap-south-1).
 - **Solution**: Check IAM permissions for Bedrock service role.
 
 ### Agent Not Using KNOWLEDGE Tool

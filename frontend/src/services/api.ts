@@ -179,11 +179,26 @@ export interface CropHealthResponse {
   prevention: string[]
   affected_crops: string[]
   image_url?: string
+  raw_labels?: { name: string; confidence: number; bounding_box?: { left: number; top: number; width: number; height: number } }[]
+  model_source?: 'rekognition_custom' | 'rekognition_general' | 'fallback'
 }
+
+export interface ModelStatusResponse {
+  status: string
+  can_analyze: boolean
+  message: string
+}
+
+export const getCropModelStatus = () =>
+  api.get<ModelStatusResponse>('/api/crop-health/model-status').then(r => r.data)
+
+export const startCropModel = () =>
+  api.post<{ status: string; message: string }>('/api/crop-health/start-model').then(r => r.data)
 
 export const analyzeCropHealth = (formData: FormData) =>
   api.post<CropHealthResponse>('/api/crop-health/analyze', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 60000,
   }).then((r) => r.data)
 
 export const getCropDiseaseInfo = (cropName: string, diseaseName: string, language: string) =>

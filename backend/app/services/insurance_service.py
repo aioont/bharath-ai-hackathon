@@ -105,60 +105,63 @@ def _normalise(raw: dict) -> dict:
 # ---------------------------------------------------------------------------
 
 async def _bedrock_rag(query: str, kb_id: str, max_results: int = 5) -> tuple[str, list[dict]]:
-    """Query Bedrock KB and return generated answer + source citations."""
+    """
+    Retrieve chunks from Bedrock KB (retrieve_only — no model ARN needed),
+    then pass the context into Nova Pro via the converse API.
+    Avoids RetrieveAndGenerate which requires a valid account-specific inference profile ARN.
+    """
     try:
         from app.core.aws_client import get_bedrock_client
         from app.core.cache import get_cached_bedrock_kb_query, cache_bedrock_kb_query
-        
+
         # Check cache first (MAJOR COST SAVINGS - OpenSearch is expensive!)
         cached_result = await get_cached_bedrock_kb_query(query, kb_id)
         if cached_result:
             logger.info("insurance_kb_cache_hit", query=query[:50])
-            # Cached result is just the text, return with empty citations
             return cached_result, []
-        
+
         client = get_bedrock_client()
 
-        # Run blocking call in thread
-        response = await asyncio.to_thread(
-            client.retrieve_and_generate,
+        # Step 1: Retrieve chunks (no model ARN needed — just vector search)
+        chunks = await asyncio.to_thread(
+            client.retrieve_only,
             query=query,
-            kb_id=kb_id, 
-            max_results=max_results
+            kb_id=kb_id,
+            max_results=max_results,
         )
 
-        output_text = response.get("output", {}).get("text", "")
-        citations = response.get("citations", [])
-        
-        # Cache the result (semantic + exact match) - COST SAVINGS
+        if not chunks:
+            logger.warning("bedrock_kb_no_chunks", kb_id=kb_id, query=query[:50])
+            return "", []
+
+        sources = [{"content": c["text"][:300], "uri": c.get("source", "")} for c in chunks]
+
+        # Step 2: Build context string and let Nova Pro reason over it
+        context_text = "\n\n---\n\n".join(c["text"] for c in chunks)
+        synthesis_prompt = (
+            f"Using the following knowledge base excerpts about Indian agricultural insurance schemes, "
+            f"answer this query concisely:\n\nQuery: {query}\n\nKnowledge Base Context:\n{context_text}"
+        )
+
+        output_text = await asyncio.to_thread(
+            client.invoke_nova,
+            synthesis_prompt,
+            800,   # max_tokens
+            0.3,   # temperature — factual summary
+            True,  # pro=True
+        )
+
         if output_text:
             await cache_bedrock_kb_query(query, kb_id, output_text)
-            logger.info("insurance_kb_cached", query=query[:50])
-        
-        # Log retrieved KB data clearly
+
         logger.info(
             "bedrock_kb_retrieval_success",
             kb_id=kb_id,
-            query_used=query,
-            content_preview=output_text[:200] + "..." if output_text else "No content generated",
-            sources_count=len(citations),
+            chunks=len(chunks),
+            content_preview=output_text[:200] + "..." if output_text else "",
         )
-
-        sources = []
-        for c in citations:
-            for ref in c.get("retrievedReferences", []):
-                snippet = ref.get("content", {}).get("text", "")[:300]
-                loc = ref.get("location", {}).get("s3Location", {})
-                uri = loc.get("uri", "")
-                
-                # Log individual source retrieval
-                logger.debug("bedrock_kb_source_item", uri=uri, snippet_preview=snippet[:50])
-                
-                sources.append({
-                    "content": snippet,
-                    "uri": uri,
-                })
         return output_text, sources
+
     except Exception as exc:
         logger.warning("bedrock_kb_failed", error=str(exc))
         return "", []
@@ -361,21 +364,18 @@ async def suggest_insurance(
 
     logger.info("insurance_suggestion_reasoning", system=system, user_prompt=prompt)
     
-    # Use Haiku via Bedrock if available (User requested marketplace model for suggestion)
-    # Defaulting to use it when KB is active, as that implies AWS features are on for this flow.
-    if kb_id:
-        try:
-            from app.core.aws_client import get_bedrock_client
-            client = get_bedrock_client()
-            # Combine system and user prompt for Haiku simple invocation
-            full_prompt = f"{system}\n\nUSER REQUEST:\n{prompt}"
-            ai_recommendation = await asyncio.to_thread(client.invoke_haiku, full_prompt)
-        except Exception as e:
-            logger.error("haiku_suggestion_failed", error=str(e))
-            # Fallback to Sarvam
-            messages = [{"role": "user", "content": prompt}]
-            ai_recommendation = await _agent_loop(messages, system, tools_enabled=False)
-    else:
+    # Use Amazon Nova Pro via Bedrock converse API (available in ap-south-1, stronger reasoning)
+    # Falls back to Sarvam-M if Bedrock is not configured / unreachable.
+    try:
+        from app.core.aws_client import get_bedrock_client
+        client = get_bedrock_client()
+        full_prompt = f"{system}\n\nUSER REQUEST:\n{prompt}"
+        # pro=True → Nova Pro for insurance (better reasoning); auto-falls back to Nova Lite
+        ai_recommendation = await asyncio.to_thread(
+            client.invoke_nova, full_prompt, 1500, 0.5, True
+        )
+    except Exception as e:
+        logger.warning("nova_suggestion_failed_fallback_sarvam", error=str(e))
         messages = [{"role": "user", "content": prompt}]
         ai_recommendation = await _agent_loop(messages, system, tools_enabled=False)
 

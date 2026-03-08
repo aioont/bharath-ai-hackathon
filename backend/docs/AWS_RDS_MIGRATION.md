@@ -500,7 +500,7 @@ DATABASE_URL = f"postgresql://postgres:{get_rds_auth_token()}@..."
 After migration, update your README with:
 
 ✅ **Full AWS Stack:**
-- ✅ AWS Bedrock (Knowledge Bases, Claude 3 Haiku)
+- ✅ AWS Bedrock (Knowledge Bases, Amazon Nova Pro/Lite)
 - ✅ AWS ElastiCache Serverless (Valkey)
 - ✅ **AWS RDS PostgreSQL** (newly migrated!)
 - ✅ AWS S3 (image storage)

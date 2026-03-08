@@ -123,7 +123,7 @@ CREATE TABLE chat_messages (
     confidence_score DECIMAL(3,2),
     
     -- Performance & cost tracking
-    tool_calls JSONB,                   -- Agent tool usage log
+    tool_calls JSONB,                   -- Agent age log
     guardrail_result VARCHAR(20),
     response_time_ms INTEGER,
     message_hash VARCHAR(64),           -- For semantic caching

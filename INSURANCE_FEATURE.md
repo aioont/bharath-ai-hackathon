@@ -1,7 +1,7 @@
 # AgriAI Insurance Advisor Feature
 
 ## Overview
-The Insurance Advisor is an AI-powered system designed to recommend the most suitable government insurance schemes to farmers based on their specific profile and farming data. It leverages **AWS Bedrock Knowledge Base** for accurate scheme data and **Claude 3 Haiku** for intelligent reasoning and personalized advice.
+The Insurance Advisor is an AI-powered system designed to recommend the most suitable government insurance schemes to farmers based on their specific profile and farming data. It leverages **AWS Bedrock Knowledge Base** for accurate scheme data and **Amazon Nova Pro** for intelligent reasoning and personalized advice.
 
 ## How It Works
 
@@ -19,7 +19,7 @@ The Insurance Advisor is an AI-powered system designed to recommend the most sui
 
 3.  **AI Models Used**:
     *   **Retrieval**: AWS Bedrock Knowledge Base (Titan Embeddings v2).
-    *   **Reasoning & Formatting**: **Claude 3 Haiku** (via AWS Bedrock) or **Sarvam-M** (Fallback).
+    *   **Reasoning & Formatting**: **Amazon Nova Pro** (via AWS Bedrock `converse` API) or **Sarvam-M** (Fallback).
     *   **Guardrails**: AWS Bedrock Guardrails ensures safety and relevance.
 
 4.  **Prompt Strategy**:
@@ -35,4 +35,4 @@ The Insurance Advisor is an AI-powered system designed to recommend the most sui
 *   **Accessibility**: returns detailed, actionable steps in the user's local language (supported via Sarvam).
 
 ## Technical Flow
-`User Frontend` -> `FastAPI Backend` -> `AWS Bedrock Agent (KB)` -> `Claude 3 Haiku` -> `Formatted Response`
+`User Frontend` -> `FastAPI Backend` -> `AWS Bedrock Agent (KB)` -> `Amazon Nova Pro` -> `Formatted Response`

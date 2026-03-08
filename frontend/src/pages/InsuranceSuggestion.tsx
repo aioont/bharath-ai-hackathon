@@ -48,27 +48,40 @@ const CROPS = [
 // ── Component ────────────────────────────────────────────────────────────────
 export default function InsuranceSuggestion() {
     const { state, t } = useAppContext()
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const profile = state.userProfile as any
+    const profile = state.userProfile
+    const authUser = state.authUser
     const lang = state.selectedLanguage.code || 'en'
 
-    // Form state — pre-fill from profile
+    // Map stored farmingType values to form display values
+    const farmingTypeMap: Record<string, string> = {
+        organic: 'Organic',
+        mixed: 'Mixed',
+        conventional: '',
+        rainfed: 'Rain-fed',
+        drip: 'Drip Irrigation',
+        canal: 'Irrigated',
+        sprinkler: 'Irrigated',
+        borewell: 'Irrigated',
+    }
+
+    // Form state — pre-fill from profile + authUser
     const [form, setForm] = useState({
-        name: profile?.name || '',
+        name: profile?.name || authUser?.full_name || '',
         age: '',
-        gender: profile?.gender || '',
-        state: profile?.state || '',
-        district: profile?.district || '',
+        gender: '',
+        state: profile?.state || authUser?.state || '',
+        district: profile?.district || authUser?.district || '',
         occupation: 'Farmer',
-        land_acres: profile?.landAcres ? String(profile.landAcres) : '',
-        crop: profile?.primaryCrop || '',
-        farming_type: '',
+        land_acres: '',
+        crop: '',
+        farming_type: farmingTypeMap[profile?.farmingType || authUser?.farming_type || ''] || '',
         income_level: '',
         category: 'General',
     })
 
     const [loading, setLoading] = useState(false)
     const [result, setResult] = useState<InsuranceResult | null>(null)
+    const [error, setError] = useState<string | null>(null)
     const [expanded, setExpanded] = useState<string | null>(null)
     const [autoSpeak, setAutoSpeak] = useState(false)
     const [myCrops, setMyCrops] = useState<FarmerCrop[]>([])
@@ -77,20 +90,33 @@ export default function InsuranceSuggestion() {
         getCrops().then(setMyCrops).catch(() => {})
     }, [])
 
-    // Update form when profile loads
+    // Update form when profile/authUser loads (e.g. after hydration)
     useEffect(() => {
-        if (profile) {
-            setForm(prev => ({
-                ...prev,
-                name: profile.name || prev.name,
-                gender: profile.gender || prev.gender,
-                state: profile.state || prev.state,
-                district: profile.district || prev.district,
-                land_acres: profile.landAcres ? String(profile.landAcres) : prev.land_acres,
-                crop: profile.primaryCrop || prev.crop,
-            }))
+        setForm(prev => ({
+            ...prev,
+            name: profile?.name || authUser?.full_name || prev.name,
+            state: profile?.state || authUser?.state || prev.state,
+            district: profile?.district || authUser?.district || prev.district,
+            farming_type: farmingTypeMap[profile?.farmingType || authUser?.farming_type || ''] || prev.farming_type,
+        }))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [profile, authUser])
+
+    // Auto-select primary crop from myCrops when they load
+    useEffect(() => {
+        if (myCrops.length === 0) return
+        const primary = myCrops.find(c => c.is_primary) ?? myCrops[0]
+        const irrigationMap: Record<string, string> = {
+            rainfed: 'Rain-fed', drip: 'Drip Irrigation',
+            canal: 'Irrigated', sprinkler: 'Irrigated', borewell: 'Irrigated',
         }
-    }, [profile])
+        setForm(prev => ({
+            ...prev,
+            crop: prev.crop || primary.crop_name,
+            land_acres: prev.land_acres || (primary.area_acres ? String(primary.area_acres) : ''),
+            farming_type: prev.farming_type || (primary.irrigation ? irrigationMap[primary.irrigation] ?? '' : ''),
+        }))
+    }, [myCrops])
 
     const set = (k: string, v: string) => setForm(prev => ({ ...prev, [k]: v }))
 
@@ -98,6 +124,7 @@ export default function InsuranceSuggestion() {
         e.preventDefault()
         setLoading(true)
         setResult(null)
+        setError(null)
         try {
             const resp = await api.post<InsuranceResult>('/api/insurance/suggest', {
                 ...form,
@@ -105,10 +132,14 @@ export default function InsuranceSuggestion() {
                 land_acres: form.land_acres ? parseFloat(form.land_acres) : undefined,
                 language: lang,
                 tts_enabled: autoSpeak,
-            })
+            }, { timeout: 90000 })
             setResult(resp.data)
-        } catch { /* silent */ }
-        finally { setLoading(false) }
+        } catch (err: unknown) {
+            const msg = (err as { code?: string; response?: { data?: { detail?: string } } })?.code === 'ECONNABORTED'
+                ? 'Request timed out. The AI analysis is taking longer than expected — please try again.'
+                : ((err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? 'Something went wrong. Please try again.')
+            setError(msg)
+        } finally { setLoading(false) }
     }
 
     return (
@@ -141,6 +172,14 @@ export default function InsuranceSuggestion() {
                     </button>
                 </div>
             </div>
+
+            {/* Error banner */}
+            {error && (
+                <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm flex items-start gap-2">
+                    <span className="text-lg leading-none">⚠️</span>
+                    <span>{error}</span>
+                </div>
+            )}
 
             {/* Form */}
             {!result && (
@@ -230,23 +269,19 @@ export default function InsuranceSuggestion() {
                                     {myCrops.length > 0 ? (
                                         <select
                                             className="w-full bg-white border border-teal-200 text-teal-800 font-medium rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                                            value={myCrops.find(c => c.crop_name === form.crop)?.id ?? ''}
                                             onChange={(e) => {
                                                 const c = myCrops.find(cr => cr.id === e.target.value)
                                                 if (c) {
                                                     set('crop', c.crop_name)
                                                     if (c.area_acres) set('land_acres', String(c.area_acres))
-                                                    // Map irrigation to farming type
                                                     const irrigationMap: Record<string, string> = {
-                                                        'rainfed': 'Rain-fed',
-                                                        'drip': 'Drip Irrigation',
-                                                        'canal': 'Irrigated',
-                                                        'sprinkler': 'Irrigated',
-                                                        'borewell': 'Irrigated'
+                                                        rainfed: 'Rain-fed', drip: 'Drip Irrigation',
+                                                        canal: 'Irrigated', sprinkler: 'Irrigated', borewell: 'Irrigated',
                                                     }
                                                     if (c.irrigation && irrigationMap[c.irrigation]) set('farming_type', irrigationMap[c.irrigation])
                                                 }
                                             }}
-                                            defaultValue=""
                                         >
                                             <option value="" disabled>Select from My Crops</option>
                                             {myCrops.map(c => (
@@ -283,7 +318,7 @@ export default function InsuranceSuggestion() {
                                 <label className="text-xs font-medium text-gray-500 block mb-1">{t('incomeLevel')}</label>
                                 <select value={form.income_level} onChange={e => set('income_level', e.target.value)}
                                     className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500">
-                                    <option value="">{t('selectSoil')}</option>
+                                    <option value="">{t('incomeLevel')}</option>
                                     {INCOME_LEVELS.map(l => <option key={l}>{l}</option>)}
                                 </select>
                             </div>
