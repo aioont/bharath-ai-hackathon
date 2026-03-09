@@ -78,26 +78,11 @@ Indian farmers face a critical **language barrier** when accessing agricultural 
 
 **Configuration:**
 - **Vector Store:** OpenSearch Serverless (2 collections)
-  - `agriculture-kb`: 1,200+ farming docs (PDFs, web articles)
-  - `insurance-kb`: 850+ govt schemes (myscheme.gov.in)
+  - `agriculture-kb`: Farming docs (PDFs, web articles)
+  - `insurance-kb`: Govt schemes (myscheme.gov.in)
 - **Embedding Model:** Amazon Titan Embeddings G1 - Text
 - **Generation Model:** Amazon Nova Pro (strong reasoning, available in ap-south-1)
 
-**Cost Without Caching:**
-```
-OpenSearch Serverless: 2 collections × $350/month = $700/month
-Bedrock API calls: 50K queries/month × $0.00025 = $125/month
-Total: ~$825/month
-```
-
-**Cost With Our Caching:**
-```
-OpenSearch: 60-80% reduction = $140-280/month (cached hits)
-Bedrock API: 70% reduction = $37/month
-ElastiCache Serverless: $9-28/month (pay-per-use)
-Total: ~$186-345/month
-SAVINGS: ~$480-639/month (58-77% reduction!) 🎉
-```
 
 **Implementation Highlights:**
 - **Semantic Query Deduplication:** Hash-based matching for paraphrases
@@ -116,19 +101,6 @@ See: [`app/core/cache.py`](app/core/cache.py) - `cache_bedrock_kb_query()`
 - **Open Source:** Valkey = Redis fork (no licensing issues)
 - **Cost Efficiency:** 50-70% cheaper for startups with variable workloads
 
-**Production Costs (Actual Usage):**
-```
-Light traffic (1000 ECPU avg):  $9-14/month
-Medium traffic (2500 ECPU avg): $19-28/month
-Heavy traffic (5000 ECPU avg):  $37-47/month
-
-vs. Fixed Redis nodes (t4g.small): $24-48/month 24/7 (even when idle!)
-```
-
-**Cache Performance (Production Metrics):**
-- Hit Rate: **72.5%** (target: >60%)
-- Avg Latency: 5ms cached vs. 300-800ms API call
-- Memory Usage: 2.4 MB (well under serverless limits)
 
 **Multi-Tier TTL Strategy:**
 | Service | TTL | Reasoning |
@@ -147,12 +119,6 @@ See: [`app/core/cache.py`](app/core/cache.py) - `TTL_CONFIG`
 
 **Usage:**
 - Bucket: `agri-translate-images` (ap-south-1)
-- Average: 500 images/month × 2 MB = 1 GB storage
-- Cost: ~$0.023/GB/month = **$0.02/month** (negligible)
-
-**Optimization:**
-- Lifecycle policy: Delete temporary uploads after 30 days
-- Intelligent tiering for documents (accessed <1/month)
 
 ---
 
@@ -585,69 +551,6 @@ POST /api/eval/run-single?case_id=tc_weather_hindi_forecast
 
 ---
 
-## 📈 Metrics & Performance
-
-### API Performance (Production Load)
-```
-Endpoint                P50      P95      P99
-────────────────────────────────────────────
-/api/chat               420ms    1.2s     2.1s
-/api/translate          85ms     180ms    320ms
-/api/weather            120ms    250ms    450ms
-/api/market/prices      95ms     210ms    380ms
-/api/crop-health        1.8s     3.2s     5.1s
-```
-
-### Cache Hit Rates (7-Day Average)
-```
-Service              Hit Rate    Savings/Day
-──────────────────────────────────────────
-Bedrock KB              72.5%       $15.80
-Translation             89.2%       $3.20
-Weather                 91.3%       $0.80
-Market Prices           45.7%       $1.10
-Insurance Schemes       78.4%       $2.30
-──────────────────────────────────────────
-Total Daily Savings:              $23.20
-Monthly Projection:              ~$696
-```
-
-### Infrastructure Costs (Monthly)
-```
-Service                  Cost      Notes
-────────────────────────────────────────────────────
-AWS OpenSearch          $140      (was $700 pre-cache)
-AWS Bedrock API         $37       (was $125 pre-cache)
-ElastiCache Serverless  $19       (2500 ECPU avg)
-S3 Storage              $0.30     (15 GB + 500 req)
-Supabase PostgreSQL     $25       (Pro plan)
-Sarvam AI API           $45       (est. 50K calls)
-────────────────────────────────────────────────────
-Total Monthly:          $266.30   (vs. $895 before!)
-```
-
----
-
-## 🔐 Security & Compliance
-
-### Data Protection
-- ✅ **Encryption at Rest:** S3 (AES-256), PostgreSQL (TDE)
-- ✅ **Encryption in Transit:** TLS 1.3 for all API calls
-- ✅ **Password Security:** bcrypt (12 rounds)
-- ✅ **JWT Tokens:** HS256 signing, 24-hour expiry
-
-### Privacy
-- ✅ **No PII Logging:** Farmer names/locations scrubbed from logs
-- ✅ **Data Residency:** AWS ap-south-1 (India region)
-- ✅ **GDPR-Ready:** User deletion API (`DELETE /api/users/{id}`)
-
-### Monitoring
-- ✅ **Structured Logs:** JSON format for CloudWatch/ELK
-- ✅ **Error Tracking:** Sentry integration (disabled in dev)
-- ✅ **Performance Metrics:** `/admin/cache/stats` dashboard
-
----
-
 ## 🚢 Deployment
 
 ### Docker (Recommended)
@@ -689,7 +592,6 @@ aws ecs update-service --cluster agri-cluster --service agri-backend-service --f
 
 ### Interactive Docs
 - **Swagger UI:** http://localhost:8000/docs
-- **ReDoc:** http://localhost:8000/redoc
 
 ### Key Endpoints
 ```
@@ -731,16 +633,6 @@ curl -X POST http://localhost:8000/api/chat \
 }
 ```
 
----
-
-## 🤝 Contributing
-
-### Code Standards
-- **Linting:** Ruff (PEP 8 + type hints)
-- **Type Checking:** mypy (strict mode)
-- **Testing:** pytest (80%+ coverage target)
-- **Commit Convention:** Conventional Commits (feat/fix/docs)
-
 ### Development Workflow
 ```bash
 # Install dev dependencies
@@ -761,21 +653,8 @@ ruff format app/
 
 ---
 
-## 📞 Support & Contact
-
-### Technical Documentation
-- **Architecture Diagrams:** [`docs/architecture.md`](docs/architecture.md)
-- **AWS Setup Guide:** [`scripts/AWS_SETUP.md`](scripts/AWS_SETUP.md)
-- **Cache Configuration:** [`AWS_ELASTICACHE_SETUP.md`](../AWS_ELASTICACHE_SETUP.md)
-- **Knowledge Base Ingestion:** [`scripts/README_INGESTION.md`](scripts/README_INGESTION.md)
-
 ### Team
-- **Backend Lead:** Your Name (your.email@example.com)
-- **AI/ML Engineer:** Team Member 2
-- **DevOps:** Team Member 3
-
-### License
-MIT License - See [LICENSE](../LICENSE) for details
+Codingo
 
 ---
 
@@ -792,7 +671,6 @@ MIT License - See [LICENSE](../LICENSE) for details
 - [AGMARKNET](https://agmarknet.gov.in/) - Market price data
 - [myscheme.gov.in](https://www.myscheme.gov.in/) - Government schemes
 - [Open-Meteo](https://open-meteo.com/) - Weather forecasts
-- [data.gov.in](https://data.gov.in/) - Open government data
 
 **Inspiration:**
 This project is dedicated to the 270 million farmers of India who feed our nation. 🙏
