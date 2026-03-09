@@ -25,11 +25,17 @@ Indian agriculture faces a real information accessibility gap:
 A voice-first AI assistant built specifically for farmers, with:
 
 ✅ **15 Indian Languages**: Voice input/output via Sarvam AI (Hindi, Tamil, Telugu, Bengali, Malayalam, Kannada, Gujarati, Marathi, Punjabi, Odia, and more)
+
 ✅ **Offline-Capable PWA**: Works without internet using cached data and a service worker
+
 ✅ **Grounded Agricultural Advice**: AWS Bedrock Knowledge Bases (Agriculture KB + Insurance KB) prevent LLM hallucination
+
 ✅ **Crop Disease Detection**: Custom-trained AWS Rekognition model for plant leaf disease identification
+
 ✅ **Personalized Insurance**: Amazon Nova Pro reasons over retrieved government scheme data
+
 ✅ **Live Market Prices**: Real-time data from AGMARKNET (data.gov.in)
+
 ✅ **Smart Caching**: AWS ElastiCache Serverless (Valkey) reduces repeated API costs significantly
 
 ---
@@ -549,6 +555,23 @@ def get_cached_or_fetch(query: str, fetch_func, ttl: int):
 
 ---
 
+
+## Scheduled Jobs 
+
+APScheduler (in-process, starts with uvicorn)
+  ├── every 6 h → run_weather_alert_scan()
+  └── every 2 h → run_price_alert_scan()
+
+## AWS Knowledge Base Use 
+Agriculture KB (XPS3ZHO4BB) ✅
+
+retrieve_only works — returns 5 chunks
+RetrieveAndGenerate skipped — Bedrock Console → Model access → Amazon Nova Pro. The fallback passes raw chunks to Sarvam-M for synthesis instead, which works fine.
+Insurance KB (PSTRF0TREZ) ✅
+
+Returns precise scheme data (PMFBY, Pashu Bima, Weather Crop Insurance) with relevance scores
+
+
 ### 3. **Sarvam AI - Indic Language Mastery**
 
 **Why Sarvam over GPT/Claude alone?**  
@@ -967,7 +990,7 @@ project_to_win_hackathon/
 
 **License:** MIT  
 **Hackathon:** AI for Bharat 2026 (Hack2skill + AWS)  
-**Team:** Solo Developer  
+**Team:** Codingo
 **Date:** March 2026
 
 ### Third-Party Services
@@ -984,7 +1007,9 @@ project_to_win_hackathon/
 
 **Developer:** Abhinand
 **Email:** aioont8 @ gmail . com
+
 **GitHub:** [@aioont](https://github.com/aioont/bharath-ai-hackathon)  
+
 **LinkedIn:** https://www.linkedin.com/in/abhinand-i/
 
 **Technical Documentation:**
@@ -1016,18 +1041,3 @@ project_to_win_hackathon/
 
 
 
-Added new feature 
-
-
-APScheduler (in-process, starts with uvicorn)
-  ├── every 6 h → run_weather_alert_scan()
-  └── every 2 h → run_price_alert_scan()
-
-
-Agriculture KB (XPS3ZHO4BB) ✅
-
-retrieve_only works — returns 5 chunks
-RetrieveAndGenerate skipped — Amazon Nova Pro model access not enabled on your AWS account (403). Enable it in Bedrock Console → Model access → Amazon Nova Pro. The fallback passes raw chunks to Sarvam-M for synthesis instead, which works fine.
-Insurance KB (PSTRF0TREZ) ✅
-
-Returns precise scheme data (PMFBY, Pashu Bima, Weather Crop Insurance) with relevance scores
