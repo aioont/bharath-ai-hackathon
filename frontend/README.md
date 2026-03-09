@@ -1029,9 +1029,8 @@ git push origin feature/market-filters
 ## 📞 Support & Documentation
 
 ### Quick Links
-- **Live Demo:** [agri-translate.vercel.app](https://agri-translate.vercel.app)
-- **Backend API Docs:** [api.agri-translate.com/docs](http://localhost:8000/docs)
-- **Admin Dashboard:** [app/admin/eval](http://localhost:3000/admin/eval) (admin/admin)
+- **Live Demo:** [https://agri.makeasite.in/](https://agri.makeasite.in/)
+- **Admin Dashboard:** [app/admin/eval](https://agri.makeasite.in/admin/eval) (admin/admin)
 - **GitHub Repo:** [github.com/aioont/bharath-ai-hackathon](https://github.com/aioont/bharath-ai-hackathon)
 
 ### Component Documentation
@@ -1066,11 +1065,6 @@ For evaluation dashboard and cache monitoring:
 
 ---
 
-## 📝 License
-
-MIT License - See [LICENSE](../LICENSE) for details
-
----
 
 ## 🏅 Acknowledgments
 
@@ -1090,12 +1084,6 @@ MIT License - See [LICENSE](../LICENSE) for details
 
 **Inspiration:**
 This project is dedicated to India's 270 million farmers who feed our nation. 🙏
-
----
-
-## 🎯 One-Line Pitch
-
-**"Offline-capable, voice-native PWA empowering 270M Indian farmers with multilingual AI—built for 3G networks, optimized for low-literacy users, monitored with real-time LLM evaluation."**
 
 ---
 
