@@ -479,7 +479,7 @@ rec.onresult = (event) => {
 }
 ```
 
-**Browser Support:** Chrome, Edge, Safari (90%+ coverage)
+**Browser Support:** Chrome
 
 **UX Details:**
 - Animated pulse during listening
@@ -649,56 +649,6 @@ colors: {
 
 ---
 
-## ⚡ Performance Optimizations
-
-### Build Optimizations
-**Vite 5.1 Benefits:**
-- **ESBuild:** 10-100x faster than Webpack
-- **Code Splitting:** Automatic route-based chunks
-- **Tree Shaking:** Removes unused code
-- **Minification:** Terser for JS, cssnano for CSS
-
-**Build Output (Production):**
-```
-dist/
-├── index.html             # 2.1 KB (gzipped)
-├── assets/
-│   ├── index-a3f2b9c1.js  # 245 KB (vendor + app, gzipped)
-│   ├── index-7d4e8f0a.css # 18 KB (Tailwind, purged)
-│   └── chat-d8e9f1a2.js   # 45 KB (lazy loaded)
-```
-
-**Total Download:** <300 KB (first load), <50 KB (subsequent loads with cache)
-
-### Image Optimization
-- **Formats:** WebP with PNG fallback
-- **Lazy Loading:** `loading="lazy"` on images
-- **Responsive Images:** srcset for different screen sizes
-- **Icon Sprites:** SVG sprite sheet (one HTTP request)
-
-### API Caching
-**Axios Interceptors:** [`src/services/api.ts`](src/services/api.ts)
-
-```tsx
-// Cache frequently accessed data in memory
-const cache = new Map()
-
-api.interceptors.response.use(response => {
-  if (response.config.method === 'GET') {
-    cache.set(response.config.url, response.data)
-  }
-  return response
-})
-```
-
-### React Optimizations
-- **useCallback:** Memoize event handlers
-- **useMemo:** Expensive computations (market charts)
-- **React.lazy:** Code-splitting for routes
-- **Debouncing:** Search inputs (300ms delay)
-
----
-
 ## 🛠 Development Workflow
 
 ### Prerequisites
@@ -723,12 +673,6 @@ npm run build
 npm run preview
 ```
 
-### Development Features
-- **Hot Module Replacement (HMR):** Instant updates without full reload
-- **Fast Refresh:** Preserves React state during edits
-- **TypeScript Checking:** Real-time type errors in IDE
-- **ESLint:** Code quality warnings
-- **Prettier:** Auto-formatting (on save)
 
 ### Environment Variables
 **File:** `.env` (not committed, use `.env.example`)
@@ -806,153 +750,6 @@ npm run lint -- --fix
   <Mic size={20} aria-hidden />
 </button>
 ```
-
----
-
-## 📦 Deployment
-
-### Build for Production
-```bash
-npm run build
-# Output: dist/ (optimized for CDN)
-```
-
-### Deployment Options
-
-#### 1. **Vercel (Recommended - Zero Config)**
-```bash
-# Install Vercel CLI
-npm i -g vercel
-
-# Deploy
-vercel --prod
-
-# Auto-detects Vite, configures routing
-```
-
-**Features:**
-- Automatic HTTPS
-- Global CDN (Edge Network)
-- Preview deployments (per PR)
-- Environment variables UI
-
-#### 2. **Netlify**
-```bash
-# netlify.toml
-[build]
-  command = "npm run build"
-  publish = "dist"
-
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200  # SPA fallback
-```
-
-#### 3. **AWS S3 + CloudFront**
-```bash
-# Build
-npm run build
-
-# Upload to S3
-aws s3 sync dist/ s3://agri-frontend-bucket --delete
-
-# Invalidate CloudFront cache
-aws cloudfront create-invalidation --distribution-id E1234567890 --paths "/*"
-```
-
-#### 4. **Docker (with Nginx)**
-**Dockerfile:**
-```dockerfile
-# Build stage
-FROM node:18-alpine AS build
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci --only=production
-COPY . .
-RUN npm run build
-
-# Serve stage
-FROM nginx:alpine
-COPY --from=build /app/dist /usr/share/nginx/html
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-EXPOSE 80
-CMD ["nginx", "-g", "daemon off;"]
-```
-
-**Nginx Config:** [`nginx.conf`](nginx.conf)
-```nginx
-server {
-  listen 80;
-  location / {
-    root /usr/share/nginx/html;
-    index index.html;
-    try_files $uri $uri/ /index.html;  # SPA routing
-  }
-  
-  # Gzip compression
-  gzip on;
-  gzip_types text/css application/javascript;
-  
-  # Cache static assets
-  location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg)$ {
-    expires 1y;
-    add_header Cache-Control "public, immutable";
-  }
-}
-```
-
-### Environment Configuration (Production)
-```env
-# Point to production backend
-VITE_API_URL=https://api.agri-translate.com
-
-# Enable analytics
-VITE_ENABLE_ANALYTICS=true
-```
-
----
-
-## 📊 Metrics & Performance
-
-### Lighthouse Score (Production Build)
-```
-Performance:     98/100  ⭐
-Accessibility:   100/100 ⭐
-Best Practices:  95/100  ⭐
-SEO:             100/100 ⭐
-PWA:             100/100 ⭐
-```
-
-**Key Metrics:**
-- First Contentful Paint (FCP): 1.2s
-- Largest Contentful Paint (LCP): 1.8s
-- Time to Interactive (TTI): 2.4s
-- Cumulative Layout Shift (CLS): 0.02
-- First Input Delay (FID): 12ms
-
-### Bundle Size Analysis
-```bash
-# Analyze bundle
-npm run build -- --report
-
-# Output
-dist/assets/
-  vendor.js     180 KB (React, React Router, Axios)
-  app.js         65 KB (App code)
-  chat.js        45 KB (Lazy loaded)
-  tailwind.css   18 KB (Purged, only used classes)
-```
-
-### Network Performance (3G Simulation)
-| Page | Load Time | Requests | Total Size |
-|------|-----------|----------|------------|
-| Home | 2.3s | 8 | 245 KB |
-| Chat | 3.1s | 12 | 310 KB |
-| Translate | 2.8s | 9 | 265 KB |
-| Market | 3.5s | 15 | 340 KB |
-
-**Target:** <3s on 3G (achieved!)
 
 ---
 
@@ -1051,15 +848,6 @@ For evaluation dashboard and cache monitoring:
    - View cache statistics (hit rate, memory)
    - Clear cache patterns (KB, translations, weather)
    - Monitor cost savings (~$500/month)
-
-### Browser Compatibility
-| Browser | Version | Support |
-|---------|---------|---------|
-| Chrome | 90+ | ✅ Full (PWA + Voice) |
-| Edge | 90+ | ✅ Full (PWA + Voice) |
-| Safari | 14+ | ✅ Full (limited PWA on iOS) |
-| Firefox | 88+ | ⚠️ Partial (no PWA install) |
-| Samsung Internet | 14+ | ✅ Full |
 
 **Voice Features:** Requires HTTPS in production (browser security)
 
