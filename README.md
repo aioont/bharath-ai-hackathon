@@ -841,13 +841,7 @@ cache_efficiency = (cache_hits / total_requests) * 100
 | **Time to Info** | 3-4 days (visit office) | <2 minutes (AI chat) | User testing |
 | **Language Accessibility** | English only (10% farmers) | 15 languages (80% farmers) | Census 2011 |
 
-### Scalability Roadmap
 
-**Phase 1 (Current):** MVP with 15 languages, 2,050 docs  
-**Phase 2 (Month 3):** Add 7 more languages (Rajasthani, Haryanvi, etc.)  
-**Phase 3 (Month 6):** Government partnership for PMFBY integration  
-**Phase 4 (Month 12):** WhatsApp bot (300M+ Indians use WhatsApp)  
-**Phase 5 (Year 2):** Regional soil testing integration (ICAR labs)
 
 ### Sustainability Model
 - **Free tier:** All features for smallholder farmers (<5 acres)
@@ -925,7 +919,7 @@ project_to_win_hackathon/
 ## 🧪 Testing & Demo
 
 ### Live Demo
-🔗 **[AgriSaarthi Demo](https://your-demo-url.com)** *(Coming soon)*
+🔗 **[AgriSaarthi Demo](https://agri.makeasite.in/)** 
 
 ### Try It Locally
 
@@ -965,7 +959,6 @@ project_to_win_hackathon/
 - ✅ **JWT Authentication**: Secure user sessions
 - ✅ **HTTPS Only**: All API calls encrypted
 - ✅ **Data Minimization**: Only essential farmer data collected
-- ✅ **GDPR-Compliant**: Right to deletion implemented
 - ✅ **Rate Limiting**: Prevents API abuse
 
 ---
@@ -982,17 +975,17 @@ project_to_win_hackathon/
 - **AWS ElastiCache Serverless** (Valkey 7.2)
 - **Sarvam AI** (Sarvam-M, Translate, Vision, TTS, STT)
 - **Open-Meteo** (Weather API)
-- **data.gov.in** (AGMARKNET mandi prices)
+- **AGMARKNET.gov.in** (AGMARKNET mandi prices)
 - **myscheme.gov.in** (Government schemes data)
 
 ---
 
 ## 📞 Contact & Support
 
-**Developer:** [Your Name]  
-**Email:** [your-email@example.com]  
+**Developer:** Abhinand
+**Email:** aioont8 @ gmail . com
 **GitHub:** [@aioont](https://github.com/aioont/bharath-ai-hackathon)  
-**LinkedIn:** [Your LinkedIn]
+**LinkedIn:** https://www.linkedin.com/in/abhinand-i/
 
 **Technical Documentation:**
 - [Backend README](backend/README.md) - AWS setup, caching, evaluation
